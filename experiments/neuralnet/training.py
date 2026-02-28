@@ -142,10 +142,15 @@ class DataParallelismTrainer:
         # 2. Create the wrapper and apply DataParallel
         # This ensures that calls to self.model(...) are parallelized
         training_wrapper = TrainingWrapper(self.original_model)
-        self.model = torch.nn.DataParallel(
-            training_wrapper, device_ids=list(range(gpu_count))
-        )
+        if gpu_count > 1:
+            self.model = torch.nn.DataParallel(
+                training_wrapper, device_ids=list(range(gpu_count))
+            )
+        else:
+            self.model = training_wrapper
+
         self.model.to(master_device)
+        self.master_device = master_device
 
         # 3. Setup Optimizer
         # Pass parameters of the original model, not the wrapper
@@ -380,12 +385,20 @@ class DataParallelismTrainer:
     ):
 
         # Tensor types (img, text_embedding) are automatically split and moved to GPUs by DataParallel.
-        loss_kwargs = {"img": batch["image"], "loss_type": loss_type}
+        loss_kwargs = {
+            "img": batch["image"].to(self.master_device, non_blocking=True),
+            "loss_type": loss_type,
+        }
 
         # Encoder args
         if model_type == "encoder":
             loss_kwargs.update(
-                {"text_embedding": batch["text_embedding"], "alpha": alpha}
+                {
+                    "text_embedding": batch["text_embedding"].to(
+                        self.master_device, non_blocking=True
+                    ),
+                    "alpha": alpha,
+                }
             )
 
         # VAE args
@@ -395,7 +408,9 @@ class DataParallelismTrainer:
             if "llm_alignment" in loss_type:
                 loss_kwargs.update(
                     {
-                        "text_embedding": batch["text_embedding"],
+                        "text_embedding": batch["text_embedding"].to(
+                            self.master_device, non_blocking=True
+                        ),
                         "gamma": gamma,
                         "llm_alignment_loss_type": llm_alignment_loss_type,
                     }
@@ -403,7 +418,13 @@ class DataParallelismTrainer:
 
         # VAE (llm -> image)
         elif model_type == "beta_vae_llm":
-            loss_kwargs.update({"text_embedding": batch["text_embedding"]})
+            loss_kwargs.update(
+                {
+                    "text_embedding": batch["text_embedding"].to(
+                        self.master_device, non_blocking=True
+                    )
+                }
+            )
 
         return loss_kwargs
 
