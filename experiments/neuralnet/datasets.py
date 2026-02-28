@@ -206,8 +206,9 @@ class CocoH5Dataset(Dataset):
         If ``None``, the raw uint8 HWC image from the HDF5 file is returned.
     Notes
     -----
-    The HDF5 file handle is opened lazily inside ``__getitem__`` so that
-    PyTorch DataLoader multi-process workers each hold their own handle.
+    All images and embeddings are loaded eagerly into RAM during ``__init__``
+    so that DataLoader multi-process workers can access data via forked memory
+    without needing individual HDF5 file handles.
 
     Returns (per item)
     ------------------
