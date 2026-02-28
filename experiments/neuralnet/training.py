@@ -40,7 +40,7 @@ class DataParallelismTrainer:
     there.
 
     Notes
-    - Assumes 4 GPUs are available for training.
+    - Assumes less than 5 GPUs for training.
     """
 
     def __init__(
@@ -129,10 +129,8 @@ class DataParallelismTrainer:
             self.logger.log_error("GPUs are unavailable.")
             sys.exit(1)
         gpu_count = torch.cuda.device_count()
-        if gpu_count != 4:
-            self.logger.log_error(
-                "4 GPUs are required for data parallelism in training."
-            )
+        if gpu_count > 4:
+            self.logger.log_error("More than 4GPUs are requested. ")
             sys.exit(1)
 
         # Gets the first CUDA device and use it as the main device.

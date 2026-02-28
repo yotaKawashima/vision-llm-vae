@@ -4,9 +4,10 @@ import torch
 import json
 import os
 import sys
-import random
 from typing import Union
 
+import h5py
+import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset
 import torchvision.transforms as T
@@ -120,7 +121,7 @@ class CocoTextEmbeddingImageDataset(Dataset):
     def __init__(
         self,
         split,
-        img_transform=config.img_transform,
+        img_transform=None,
     ):
         self.split = split
         if not config.text_embeddings_summary:
@@ -170,6 +171,104 @@ class CocoTextEmbeddingImageDataset(Dataset):
         }
 
 
+# Available embedding keys in the HDF5 file
+H5_EMBEDDING_KEYS = [
+    "all_mpnet_base_v2_mean_embeddings",  # (N, 768)
+]
+
+
+class CocoH5Dataset(Dataset):
+    """
+    CocoH5Dataset
+    -------------
+    PyTorch Dataset that reads COCO images and embeddings directly from an HDF5
+    file (e.g. ms_coco_embeddings_square256_proper_chunks.h5).
+
+    The HDF5 file must have the following structure::
+        /train
+            /data                              (N, 256, 256, 3)  uint8 HWC
+            /coco_ids                          (N,)
+            /all_mpnet_base_v2_mean_embeddings (N, 768)
+            /image_size_hwc                    (N, 3)
+        /val  (same structure)
+
+    Parameters
+    ----------
+    h5_path : str
+        Path to the HDF5 file.
+    split : str
+        "train" or "val".
+    embedding_key : str
+        Which embedding dataset to load as ``text_embedding``.
+        Default: ``"all_mpnet_base_v2_mean_embeddings"``.
+    img_transform : callable, optional
+        Transform applied to the image tensor.
+        If ``None``, the raw uint8 HWC image from the HDF5 file is returned.
+    Notes
+    -----
+    The HDF5 file handle is opened lazily inside ``__getitem__`` so that
+    PyTorch DataLoader multi-process workers each hold their own handle.
+
+    Returns (per item)
+    ------------------
+    dict with keys:
+        "image"           torch.Tensor (C, H, W) float
+        "text_embedding"  torch.Tensor (D,) or (5, D) float
+        "image_id"        int  (COCO image id)
+    """
+
+    def __init__(
+        self,
+        h5_path: str,
+        split: str = "train",
+        embedding_key: str = "all_mpnet_base_v2_mean_embeddings",
+        img_transform=None,
+    ):
+        if split not in ("train", "val"):
+            raise ValueError(f"split must be 'train' or 'val', got '{split}'")
+        if embedding_key not in H5_EMBEDDING_KEYS:
+            raise ValueError(
+                f"embedding_key must be one of {H5_EMBEDDING_KEYS}, got '{embedding_key}'"
+            )
+
+        self.h5_path = h5_path
+        self.split = split
+        self.embedding_key = embedding_key
+        self.img_transform = img_transform
+
+        # Read all images and embeddings into memory eagerly.
+        print(f"Loading {split} dataset into RAM. This might take a minute...")
+        with h5py.File(h5_path, "r") as f:
+            self.coco_ids = f[split]["coco_ids"][:].tolist()
+            self._len = len(self.coco_ids)  # number of samples in this split
+
+            # Note: we read the entire image and embedding datasets into memory as numpy arrays.
+            self.images_np = f[split]["data"][:]
+            self.embeddings_np = f[split][self.embedding_key][:]
+        print("Done loading into RAM!")
+
+    def __len__(self):
+        return self._len
+
+    def __getitem__(self, idx):
+        # Image: uint8 HWC
+        img_np = self.images_np[idx]
+        if self.img_transform is not None:
+            image = self.img_transform(img_np)
+        else:
+            image = img_np
+
+        # Embedding
+        emb_np = self.embeddings_np[idx]
+        text_embedding = torch.from_numpy(emb_np)
+
+        return {
+            "image": image,
+            "text_embedding": text_embedding,
+            "image_id": self.coco_ids[idx],
+        }
+
+
 class NSDStimulusDataset(Dataset):
     """
     NSDStimulusDataset
@@ -183,7 +282,7 @@ class NSDStimulusDataset(Dataset):
         self,
         subject: Union[int, str],
         nsd_stimulus_info_path=config.nsd_stimulus_info_path,
-        img_transform=config.img_transform,
+        img_transform=None,
     ):
 
         # subject

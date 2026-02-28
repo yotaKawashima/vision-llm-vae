@@ -11,6 +11,7 @@ from .logger import ConsoleLogger
 from .datasets import (
     ApplyTransformSubset,
     CocoTextEmbeddingImageDataset,
+    CocoH5Dataset,
 )  # , NSDStimulusDataset
 from .training import DataParallelismTrainer
 from .evaluation import Evaluator
@@ -107,32 +108,48 @@ class CommandLineInterface:
 
     def train(self):
         """Trains the model."""
+        # Original coco datasets
+        if config.coco_version == "Doerig":
+            # Doerig et al Nat Mach Intell dataset
+            train_dataset = CocoH5Dataset(
+                h5_path=config.coco_doerig_h5_path,
+                split="train",
+                embedding_key="all_mpnet_base_v2_mean_embeddings",
+                img_transform=config.img_transform_augmentation_h5,
+            )
+            val_dataset = CocoH5Dataset(
+                h5_path=config.coco_doerig_h5_path,
+                split="val",
+                embedding_key="all_mpnet_base_v2_mean_embeddings",
+                img_transform=config.img_transform_h5,
+            )
+        else:
+            # train model
+            dataset = CocoTextEmbeddingImageDataset(
+                split="train",
+                img_transform=None,
+            )
+            val_size = 5000  # Use a fixed number of samples for validation
+            train_size = len(dataset) - val_size
 
-        # train model
-        dataset = CocoTextEmbeddingImageDataset(
-            split="train",
-            img_transform=None,
-        )
-        val_size = 5000  # Use a fixed number of samples for validation
-        train_size = len(dataset) - val_size
+            # randomly split the dataset into train and val splits with a fixed random seed for reproducibility
+            indices = torch.randperm(
+                len(dataset), generator=torch.Generator().manual_seed(0)
+            ).tolist()
+            train_indices = indices[:train_size]
+            val_indices = indices[train_size:]
 
-        # randomly split the dataset into train and val splits with a fixed random seed for reproducibility
-        indices = torch.randperm(
-            len(dataset), generator=torch.Generator().manual_seed(0)
-        ).tolist()
-        train_indices = indices[:train_size]
-        val_indices = indices[train_size:]
+            # Subset the dataset for training and validation
+            train_subset = torch.utils.data.Subset(dataset, train_indices)
+            val_subset = torch.utils.data.Subset(dataset, val_indices)
 
-        # Subset the dataset for training and validation
-        train_subset = torch.utils.data.Subset(dataset, train_indices)
-        val_subset = torch.utils.data.Subset(dataset, val_indices)
+            # use data augmentaiton for training data and no augmentation for validation data
+            train_dataset = ApplyTransformSubset(
+                train_subset, config.img_transform_augmentation
+            )
+            val_dataset = ApplyTransformSubset(val_subset, config.img_transform)
 
-        # use data augmentaiton for training data and no augmentation for validation data
-        train_dataset = ApplyTransformSubset(
-            train_subset, config.img_transform_augmentation
-        )
-        val_dataset = ApplyTransformSubset(val_subset, config.img_transform)
-
+        # data loader
         train_dataloader = torch.utils.data.DataLoader(
             train_dataset,
             batch_size=self.batch_size,
@@ -141,10 +158,10 @@ class CommandLineInterface:
             pin_memory=True,
             persistent_workers=True,
             drop_last=True,
-            prefetch_factor=4,
+            prefetch_factor=2,
         )
         val_num_workers = min(
-            4, int(val_size // self.batch_size)
+            4, int(len(val_dataset) // self.batch_size)
         )  # Use fewer workers for validation
         val_num_workers = max(1, val_num_workers)  # Ensure at least one worker
         val_dataloader = torch.utils.data.DataLoader(

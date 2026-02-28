@@ -16,21 +16,22 @@ sentence_transformer_model_name = "all-mpnet-base-v2"
 text_embedding_dim = 768
 ############################################################################
 
-num_workers = 32
-run_id = 0
+num_workers = 8
+run_id = 10
 
 ############################################################################
 ####### Training Hyperparameters ######
 number_of_epochs = 2
-batch_size = 1024
+batch_size = 256
 learning_rate = 0.0005
 clip_grad_norm = 1.0
 ###### Model ######
-model_type = "ae"  # "encoder", "ae", "beta_vae", "beta_vae_llm"
+model_type = "encoder"  # "encoder", "ae", "beta_vae", "beta_vae_llm"
 latent_dim = text_embedding_dim
-checkpoint_path = Path(
-    "/mnt/data/checkpoints/encoder_loss_norm_and_cosine_similarity_smoothL1_alpha10.0/coco2017/run_55/checkpoint_epoch50.ckpt"
-)  # or None
+checkpoint_path = None
+# checkpoint_path = Path(
+#     "/mnt/data/checkpoints/encoder_loss_norm_and_cosine_similarity_smoothL1_alpha10.0/coco2017/run_55/checkpoint_epoch50.ckpt"
+# )  # or None
 encoder_checkpoint = True  # whether to initialize the encoder with the checkpoint from the encoder model (only applicable for ae model)
 ae_checkpoint = False  # whether to initialize the ae model with the checkpoint from the ae model (only applicable for beta_vae model)
 vae_checkpoint = False  # whether to initialize the vae model with the checkpoint from the vae model (only applicable for beta_vae_llm model)
@@ -97,6 +98,8 @@ else:
 img_resize = 256
 img_mean = [0.5, 0.5, 0.5]
 img_std = [0.5, 0.5, 0.5]
+
+# PIL image
 img_transform = T.Compose(
     [
         T.Resize((img_resize, img_resize)),
@@ -116,13 +119,32 @@ img_transform_augmentation = T.Compose(
     ]
 )
 
+# h5: array of uint8 in HWC format, need to be converted to float CHW and normalized.
+img_transform_h5 = T.Compose(
+    [
+        T.ToTensor(),  # convert uint8 HWC [0, 255] to float CHW [0.0, 1.0]
+        T.Normalize(mean=img_mean, std=img_std),
+    ]
+)
+img_transform_augmentation_h5 = T.Compose(
+    [
+        T.ToTensor(),  # convert uint8 HWC [0, 255] to float CHW [0.0, 1.0]
+        T.RandomAffine(degrees=2, translate=(0.05, 0.05)),
+        T.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),
+        T.RandomGrayscale(p=0.05),
+        T.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 2.0)),
+        T.Normalize(mean=img_mean, std=img_std),
+    ]
+)
+
+
 ############################################################################
 
 ############################################################################
 ###### Variable related to data path ######
 data_dir_path = Path("/mnt/data/")
 # data_dir_path = Path("/workspace/data/")
-coco_version = "2017"
+coco_version = "Doerig"  # "2017"
 ############################################################################
 
 ############################################################################
@@ -161,16 +183,23 @@ subjects = [1, 2, 3, 4, 5, 6, 7, 8]
 ###### The followings are fixed paths and related functions ######
 ############################################################################
 ###### Paths ######
-# raw coco dataset
-raw_coco_data_dir_path = data_dir_path / "raw" / f"coco{coco_version}"
-coco_caption_train_path = (
-    raw_coco_data_dir_path / "annotations" / f"captions_train{coco_version}.json"
-)
-coco_caption_val_path = (
-    raw_coco_data_dir_path / "annotations" / f"captions_val{coco_version}.json"
-)
-coco_image_train_dir_path = raw_coco_data_dir_path / "images" / f"train{coco_version}"
-coco_image_val_dir_path = raw_coco_data_dir_path / "images" / f"val{coco_version}"
+if coco_version == "Doerig":
+    coco_doerig_h5_path = (
+        data_dir_path / "ms_coco_embeddings_square256_proper_chunks.h5"
+    )
+else:
+    raw_coco_data_dir_path = data_dir_path / "raw" / f"coco{coco_version}"
+    coco_caption_train_path = (
+        raw_coco_data_dir_path / "annotations" / f"captions_train{coco_version}.json"
+    )
+    coco_caption_val_path = (
+        raw_coco_data_dir_path / "annotations" / f"captions_val{coco_version}.json"
+    )
+    coco_image_train_dir_path = (
+        raw_coco_data_dir_path / "images" / f"train{coco_version}"
+    )
+    coco_image_val_dir_path = raw_coco_data_dir_path / "images" / f"val{coco_version}"
+
 
 # preprocessed data
 preprocessed_data_dir_path = data_dir_path / "preprocessed"
@@ -222,7 +251,11 @@ coco_checkpoints_dir_path.mkdir(parents=True, exist_ok=True)
 
 # writer path for tensorboard logs
 writer_path = (
-    Path("/mnt/runs") / full_model_name / f"coco{coco_version}" / f"run_{run_id}"
+    data_dir_path
+    / "tensorboard_runs"
+    / full_model_name
+    / f"coco{coco_version}"
+    / f"run_{run_id}"
 )
 training_history_path = coco_checkpoints_dir_path / "training_history.json"
 
