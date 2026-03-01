@@ -13,6 +13,9 @@ from torch.utils.data import Dataset
 import torchvision.transforms as T
 import pandas as pd
 
+from .logger import Logger
+
+
 # Add parent directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 import config
@@ -224,9 +227,10 @@ class CocoH5Dataset(Dataset):
         split: str = "train",
         embedding_key: str = "all_mpnet_base_v2_mean_embeddings",
         img_transform=None,
+        logger: Logger = None,
     ):
         if split not in ("train", "val"):
-            raise ValueError(f"split must be 'train' or 'val', got '{split}'")
+            raise ValueError(f"split must be 'train' or 'val' got '{split}'")
         if embedding_key not in H5_EMBEDDING_KEYS:
             raise ValueError(
                 f"embedding_key must be one of {H5_EMBEDDING_KEYS}, got '{embedding_key}'"
@@ -237,8 +241,10 @@ class CocoH5Dataset(Dataset):
         self.embedding_key = embedding_key
         self.img_transform = img_transform
 
-        # Read all images and embeddings into memory eagerly.
-        print(f"Loading {split} dataset into RAM. This might take a minute...")
+        if logger is not None:
+            logger.log_info(
+                f"Loading {split} dataset into RAM. This might take a minute..."
+            )
         with h5py.File(h5_path, "r") as f:
             self.coco_ids = f[split]["coco_ids"][:].tolist()
             self._len = len(self.coco_ids)  # number of samples in this split
@@ -246,7 +252,8 @@ class CocoH5Dataset(Dataset):
             # Note: we read the entire image and embedding datasets into memory as numpy arrays.
             self.images_np = f[split]["data"][:]
             self.embeddings_np = f[split][self.embedding_key][:]
-        print("Done loading into RAM!")
+        if logger is not None:
+            logger.log_info("Done loading into RAM!")
 
     def __len__(self):
         return self._len

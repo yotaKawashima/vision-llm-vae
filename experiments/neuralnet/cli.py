@@ -117,12 +117,14 @@ class CommandLineInterface:
                 split="train",
                 embedding_key="all_mpnet_base_v2_mean_embeddings",
                 img_transform=config.img_transform_augmentation_h5,
+                logger=self.logger,
             )
             val_dataset = CocoH5Dataset(
                 h5_path=config.coco_doerig_h5_path,
                 split="val",
                 embedding_key="all_mpnet_base_v2_mean_embeddings",
                 img_transform=config.img_transform_h5,
+                logger=self.logger,
             )
         else:
             # train model
