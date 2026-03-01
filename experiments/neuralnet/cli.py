@@ -14,7 +14,8 @@ from .datasets import (
     CocoH5Dataset,
 )  # , NSDStimulusDataset
 from .training import DataParallelismTrainer
-from .evaluation import Evaluator
+
+# from .evaluation import Evaluator
 
 
 project_root = Path(__file__).resolve().parents[2]
