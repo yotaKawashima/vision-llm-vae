@@ -251,7 +251,11 @@ class CocoH5Dataset(Dataset):
 
             # Note: we read the entire image and embedding datasets into memory as numpy arrays.
             self.images_np = f[split]["data"][:]
-            self.embeddings_np = f[split][self.embedding_key][:]
+            embeddings_np = f[split][self.embedding_key][:]
+            # make sure that embeddings are L2 normalized (they should already be, but just in case)
+            norms = np.linalg.norm(embeddings_np, axis=1, keepdims=True)
+            self.embeddings_np = embeddings_np / (norms + 1e-12)
+
         if logger is not None:
             logger.log_info("Done loading into RAM!")
 
