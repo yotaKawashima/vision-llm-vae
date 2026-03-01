@@ -211,22 +211,35 @@ class CommandLineInterface:
 
     def evaluation(self):
         """Evaluates the model."""
+        raise NotImplementedError(
+            "Evaluation for h5 dataset not implemented yet. You need text embeddings for the dataset."
+        )
+        # # evaluate the model on the val split (no data drop for evaluation)
+        # if config.coco_version == "Doerig":
+        #     # Doerig et al Nat Mach Intell dataset
+        #     test_dataset = CocoH5Dataset(
+        #         h5_path=config.coco_doerig_h5_path,
+        #         split="test",
+        #         embedding_key="all_mpnet_base_v2_mean_embeddings",
+        #         img_transform=config.img_transform_h5,
+        #     )
+        # else:
+        #     # use val dataset from the original coco dataset for evaluation
+        #     test_dataset = CocoTextEmbeddingImageDataset(
+        #         split="val",
+        #         img_transform=config.img_transform,
+        #     )
 
-        # evaluate the model on the val split (no data drop for evaluation)
-        dataset = CocoTextEmbeddingImageDataset(
-            split="val",
-            img_transform=config.img_transform,
-        )
-        dataloader = torch.utils.data.DataLoader(
-            dataset,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-            pin_memory=True,
-            persistent_workers=True,
-        )
-        evaluator = Evaluator(self.model, dataloader, self.logger)
-        evaluator.evaluate()
+        # dataloader = torch.utils.data.DataLoader(
+        #     test_dataset,
+        #     batch_size=self.batch_size,
+        #     shuffle=False,
+        #     num_workers=self.num_workers,
+        #     pin_memory=True,
+        #     persistent_workers=True,
+        # )
+        # evaluator = Evaluator(self.model, dataloader, self.logger)
+        # evaluator.evaluate()
 
     def extract_activations(self, input_modality="image"):
         """Extracts activations from the model on the dataset."""
