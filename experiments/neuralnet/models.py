@@ -589,6 +589,9 @@ class BetaVAE(AE):
         )
 
         # llm allignment loss (direction)
+        assert llm_alignment_loss_type in [
+            "cosine_similarity"
+        ], "Currently only cosine similarity loss is supported for llm alignment loss."
         llm_alignment_loss = self.latent_alignment_loss(
             mu,
             text_embedding,
@@ -651,7 +654,7 @@ class BetaVAE(AE):
                 or text_embedding is None
             ):
                 raise ValueError(
-                    "gamma, text_embedding and prior_log_var must be provided for llm_alignment loss."
+                    "gamma, text_embedding and llm_alignment_loss_type must be provided for llm_alignment loss."
                 )
             total_loss, recon_loss, kl_loss, llm_alignment_loss = (
                 self.compute_vae_loss_with_alignment(
