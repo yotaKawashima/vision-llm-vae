@@ -21,7 +21,7 @@ run_id = 0
 
 ############################################################################
 ####### Training Hyperparameters ######
-number_of_epochs = 50
+number_of_epochs = 2
 batch_size = 256
 learning_rate = 0.0005
 clip_grad_norm = 1.0
@@ -95,9 +95,12 @@ else:
     )
 ############################################################################
 ###### Image Transform ######
-img_resize = 256
-img_mean = [0.5, 0.5, 0.5]
-img_std = [0.5, 0.5, 0.5]
+img_resize = 224  # 256
+# img_mean = [0.5, 0.5, 0.5]
+# img_std = [0.5, 0.5, 0.5]
+img_mean = [0.485, 0.456, 0.406]
+img_std = [0.229, 0.224, 0.225]
+
 
 # PIL image
 img_transform = T.Compose(

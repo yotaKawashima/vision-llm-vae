@@ -6,7 +6,7 @@ import json
 import torch
 from pathlib import Path
 
-from . import models
+from . import models_resnet as models
 from .logger import ConsoleLogger
 from .datasets import (
     ApplyTransformSubset,
