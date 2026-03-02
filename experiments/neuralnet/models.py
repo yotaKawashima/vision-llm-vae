@@ -741,7 +741,7 @@ class BetaVAEScalingLLM(BetaVAE):
 
     def _freeze_encoder(self, freeze: bool = True) -> None:
         """
-        Freeze or unfreeze the decoder weights of vae.
+        Freeze or unfreeze the encoder weights of vae.
         Parameters
         ----------
         freeze: bool
@@ -760,7 +760,7 @@ class BetaVAEScalingLLM(BetaVAE):
         Parameters
         ----------
         freeze: bool
-            If True, freeze the encoder weights. If False, unfreeze them.
+            If True, freeze the decoder weights. If False, unfreeze them.
         """
         for param in self.decoder_input.parameters():
             param.requires_grad = not freeze
@@ -775,8 +775,8 @@ class BetaVAEScalingLLM(BetaVAE):
 
         Parameters
         ----------
-        img: pytorch.Tensor (batch x Channel x Height x Width)
-            Input image tensor to the network
+        inputs: pytorch.Tensor (batch x latent_dim)
+            Input latent tensor to the network
         Returns
         -------
         Tuple[torch.Tensor, torch.Tensor]
