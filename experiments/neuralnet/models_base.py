@@ -47,7 +47,6 @@ class BaseModel(nn.Module, ABC):
         self,
         checkpoint_path: Optional[Union[str, Path]] = None,
         strict: bool = True,
-        seed: int = 0,
     ) -> None:
         """
         Set weights of the network. If no checkpoint is provided, initialize using Xavier Uniform initialization.
@@ -69,20 +68,7 @@ class BaseModel(nn.Module, ABC):
             self._log_success(f"\nWeights loaded from checkpoint: {checkpoint_path}")
 
         else:  # when checkpoint is not provided
-            # set random seed for reproducibility
-            torch.manual_seed(seed)
-            if torch.cuda.is_available():
-                torch.cuda.manual_seed_all(seed)
-
-            for name, param in self.named_parameters():
-                if "weight" in name and param.ndim > 1:
-                    nn.init.xavier_uniform_(param)
-                elif "bias" in name:
-                    nn.init.zeros_(param)
-
-            self._log_success(
-                "Weights initialized using Xavier Uniform initialization."
-            )
+            self._log_success("Weights initialized")
 
     def _load_state_dict_from_checkpoint(
         self, checkpoint_path: Union[str, Path]
