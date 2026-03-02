@@ -316,9 +316,7 @@ class AE(Encoder):
         output = self.decoder(output)
         return self.final_layer(output)
 
-    def forward(
-        self, inputs: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, inputs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Forward pass through the network. Given inputs, returns the reconstructed image.
 
