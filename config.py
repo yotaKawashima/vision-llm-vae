@@ -17,12 +17,12 @@ text_embedding_dim = 768
 ############################################################################
 
 num_workers = 2
-run_id = 0
+run_id = 100
 
 ############################################################################
 ####### Training Hyperparameters ######
 number_of_epochs = 2
-batch_size = 256
+batch_size = 128
 learning_rate = 0.0005
 clip_grad_norm = 1.0
 ###### Model ######
