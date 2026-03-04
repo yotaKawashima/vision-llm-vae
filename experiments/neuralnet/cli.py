@@ -6,7 +6,8 @@ import json
 import torch
 from pathlib import Path
 
-from . import models_resnet as models
+from . import models
+from . import models_resnet
 from .logger import ConsoleLogger
 from .datasets import (
     ApplyTransformSubset,
@@ -37,6 +38,7 @@ class CommandLineInterface:
 
         # Initializes some class members
         self.command = None
+        self.resnet_flag = None
         self.batch_size = None
         self.learning_rate = None
         self.number_of_epochs = None
@@ -63,16 +65,19 @@ class CommandLineInterface:
 
         # Parses the command line arguments of the application
         self.parse_command_line_arguments()
+        model_lib = models_resnet if self.resnet_flag else models
+        if self.resnet_flag:
+            self.logger.log_info("Using ResNet-based model architecture.")
 
         if self.model_type == "encoder":
-            self.model = models.Encoder(
+            self.model = model_lib.Encoder(
                 latent_dim=config.latent_dim,
                 image_size=config.img_resize,
                 checkpoint_path=config.checkpoint_path,
                 logger=self.logger,
             )
         elif self.model_type == "ae":
-            self.model = models.AE(
+            self.model = model_lib.AE(
                 latent_dim=config.latent_dim,
                 image_size=config.img_resize,
                 checkpoint_path=config.checkpoint_path,
@@ -80,7 +85,7 @@ class CommandLineInterface:
                 encoder_checkpoint=self.encoder_checkpoint,
             )
         elif self.model_type == "beta_vae":
-            self.model = models.BetaVAE(
+            self.model = model_lib.BetaVAE(
                 latent_dim=config.latent_dim,
                 image_size=config.img_resize,
                 checkpoint_path=config.checkpoint_path,
@@ -88,7 +93,7 @@ class CommandLineInterface:
                 ae_checkpoint=self.ae_checkpoint,
             )
         elif self.model_type == "beta_vae_llm":
-            self.model = models.BetaVAEScalingLLM(
+            self.model = model_lib.BetaVAEScalingLLM(
                 latent_dim=config.latent_dim,
                 image_size=config.img_resize,
                 checkpoint_path=config.checkpoint_path,
@@ -334,6 +339,13 @@ class CommandLineInterface:
             "train", help="Trains neural networks."
         )
         train_command_parser.add_argument(
+            "--resnet-flag",
+            dest="resnet_flag",
+            action=argparse.BooleanOptionalAction,
+            default=config.resnet_flag,
+            help="If set, use the ResNet-based model architecture. Defaults to config.resnet_flag.",
+        )
+        train_command_parser.add_argument(
             "--num_workers",
             dest="num_workers",
             type=int,
@@ -466,6 +478,13 @@ class CommandLineInterface:
             "evaluation", help="Evaluates a trained model."
         )
         evaluation_command_parser.add_argument(
+            "--resnet-flag",
+            dest="resnet_flag",
+            action=argparse.BooleanOptionalAction,
+            default=config.resnet_flag,
+            help="If set, use the ResNet-based model architecture. Defaults to config.resnet_flag.",
+        )
+        evaluation_command_parser.add_argument(
             "--num_workers",
             dest="num_workers",
             type=int,
@@ -500,6 +519,13 @@ class CommandLineInterface:
         """
         extract_activations_command_parser = sub_parsers.add_parser(
             "activation-extraction", help="Extracts activations from a trained model."
+        )
+        extract_activations_command_parser.add_argument(
+            "--resnet-flag",
+            dest="resnet_flag",
+            action=argparse.BooleanOptionalAction,
+            default=config.resnet_flag,
+            help="If set, use the ResNet-based model architecture. Defaults to config.resnet_flag.",
         )
         extract_activations_command_parser.add_argument(
             "--num_workers",

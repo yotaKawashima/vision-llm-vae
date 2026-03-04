@@ -247,7 +247,7 @@ class DataParallelismTrainer:
                     epoch_metrics[k] += val * current_batch_size
 
                 # Logging (every 10 batches)
-                if (batch_step + 1) % 10 == 0:
+                if (batch_step + 1) % 50 == 0:
                     log_msg = f"Epoch: {epoch}, Batch: {batch_step + 1}"
                     # Add all metrics dynamically
                     for k, v in epoch_metrics.items():

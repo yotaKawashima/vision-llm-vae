@@ -17,16 +17,17 @@ text_embedding_dim = 768
 ############################################################################
 
 num_workers = 2
-run_id = 100
+run_id = 0
 
 ############################################################################
 ####### Training Hyperparameters ######
-number_of_epochs = 2
+number_of_epochs = 30
 batch_size = 128
 learning_rate = 0.0005
 clip_grad_norm = 1.0
 ###### Model ######
 model_type = "encoder"  # "encoder", "ae", "beta_vae", "beta_vae_llm"
+resnet_flag = True
 latent_dim = text_embedding_dim
 checkpoint_path = None
 # checkpoint_path = Path(
@@ -71,7 +72,10 @@ current_cfg = MODEL_CONFIGS[model_type]
 for key, value in current_cfg.items():
     globals()[key] = value
 
-full_model_name = model_type + f"_loss_{current_cfg['loss_type']}"
+if resnet_flag:
+    full_model_name = "resnet_" + model_type + f"_loss_{current_cfg['loss_type']}"
+else:
+    full_model_name = model_type + f"_loss_{current_cfg['loss_type']}"
 
 if model_type == "encoder":
     full_model_name = full_model_name + f"_alpha{current_cfg['alpha']}"
@@ -126,12 +130,14 @@ img_transform_augmentation = T.Compose(
 img_transform_h5 = T.Compose(
     [
         T.ToTensor(),  # convert uint8 HWC [0, 255] to float CHW [0.0, 1.0]
+        T.Resize((img_resize, img_resize)),
         T.Normalize(mean=img_mean, std=img_std),
     ]
 )
 img_transform_augmentation_h5 = T.Compose(
     [
         T.ToTensor(),  # convert uint8 HWC [0, 255] to float CHW [0.0, 1.0]
+        T.Resize((img_resize, img_resize)),
         T.RandomAffine(degrees=2, translate=(0.05, 0.05)),
         T.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),
         T.RandomGrayscale(p=0.05),
