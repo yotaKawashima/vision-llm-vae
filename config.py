@@ -21,13 +21,13 @@ run_id = 0
 
 ############################################################################
 ####### Training Hyperparameters ######
-number_of_epochs = 30
+number_of_epochs = 50
 batch_size = 128
 learning_rate = 0.0005
 clip_grad_norm = 1.0
 ###### Model ######
 model_type = "encoder"  # "encoder", "ae", "beta_vae", "beta_vae_llm"
-resnet_flag = True
+resnet_flag = False
 latent_dim = text_embedding_dim
 checkpoint_path = None
 # checkpoint_path = Path(
@@ -73,7 +73,7 @@ for key, value in current_cfg.items():
     globals()[key] = value
 
 if resnet_flag:
-    full_model_name = "resnet_" + model_type + f"_loss_{current_cfg['loss_type']}"
+    full_model_name = "resnet18_" + model_type + f"_loss_{current_cfg['loss_type']}"
 else:
     full_model_name = model_type + f"_loss_{current_cfg['loss_type']}"
 

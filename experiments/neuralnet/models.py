@@ -1,6 +1,6 @@
 """Module defining Variational Autoencoder (VAE) models."""
 
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 from pathlib import Path
 
 import torch
@@ -17,8 +17,7 @@ class Encoder(BaseModel):
         self,
         in_channels: int = 3,
         latent_dim: int = 768,
-        hidden_dims: Optional[List[int]] = None,
-        image_size: int = 128,
+        image_size: int = 256,
         checkpoint_path: Optional[Union[str, Path]] = None,
         logger: Optional[Logger] = None,
         set_weights: bool = True,
@@ -28,19 +27,36 @@ class Encoder(BaseModel):
 
         self.latent_dim = latent_dim
         self.image_size = image_size
+        self.hidden_dims = [32, 64, 128, 256, 512]
 
-        if hidden_dims is None:
-            self.hidden_dims = [32, 64, 128, 256, 512]
-        else:
-            self.hidden_dims = hidden_dims
-
-        # --- Encoder ---
-        modules = []
-        current_channels = in_channels
-        for h_dim in self.hidden_dims:
-            modules.append(self.make_encoder_block(current_channels, h_dim))
-            current_channels = h_dim
-        self.encoder = nn.Sequential(*modules)
+        # Track spatial size to create LayerNorm([C, H, W]) at each block
+        s = image_size
+        self.encoder = nn.Sequential(
+            self.make_encoder_block(
+                in_channels, 32, kernel_size=7, padding=3, spatial_size=s
+            ),
+            self.make_encoder_block(32, 32, kernel_size=7, padding=3, spatial_size=s),
+            self.make_encoder_block(32, 64, kernel_size=5, padding=2, spatial_size=s),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            self.make_encoder_block(
+                64, 64, kernel_size=5, padding=2, spatial_size=(s := s // 2)
+            ),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            self.make_encoder_block(
+                64, 128, kernel_size=3, padding=1, spatial_size=(s := s // 2)
+            ),
+            self.make_encoder_block(128, 128, kernel_size=3, padding=1, spatial_size=s),
+            self.make_encoder_block(128, 256, kernel_size=3, padding=1, spatial_size=s),
+            self.make_encoder_block(256, 256, kernel_size=3, padding=1, spatial_size=s),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            self.make_encoder_block(
+                256, 512, kernel_size=1, padding=0, spatial_size=(s := s // 2)
+            ),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            self.make_encoder_block(
+                512, 512, kernel_size=1, padding=0, spatial_size=s // 2
+            ),
+        )
 
         # compute shape by doing one forward pass
         with torch.no_grad():
@@ -50,28 +66,31 @@ class Encoder(BaseModel):
             self.output_features = out.flatten(1).shape[1]
 
         # Latent space mapping (AE directly connects to latent_dim)
-        self.fc_mu = nn.Sequential(
-            nn.Linear(self.output_features, latent_dim), nn.Dropout(p=0.1)
-        )
+        self.fc_mu = nn.Linear(self.output_features, latent_dim)
 
         # set weights
         if set_weights:
             self._set_weights(checkpoint_path=checkpoint_path)
 
     @staticmethod
-    def make_encoder_block(in_channels: int, out_channels: int) -> nn.Module:
-        downsample = nn.Sequential(
+    def make_encoder_block(
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int,
+        padding: int,
+        spatial_size: int,
+    ) -> nn.Module:
+        return nn.Sequential(
             nn.Conv2d(
                 in_channels,
                 out_channels,
-                kernel_size=3,
-                stride=2,
-                padding=1,
+                kernel_size=kernel_size,
+                stride=1,
+                padding=padding,
             ),
-            nn.GroupNorm(32, out_channels),
             nn.ReLU(),
+            nn.LayerNorm([out_channels, spatial_size, spatial_size]),
         )
-        return downsample
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         """
@@ -208,8 +227,7 @@ class AE(Encoder):
         self,
         in_channels: int = 3,
         latent_dim: int = 768,
-        hidden_dims: Optional[List[int]] = None,
-        image_size: int = 128,
+        image_size: int = 256,
         checkpoint_path: Optional[Union[str, Path]] = None,
         logger: Optional[Logger] = None,
         set_weights: bool = True,
@@ -219,30 +237,47 @@ class AE(Encoder):
         super().__init__(
             in_channels=in_channels,
             latent_dim=latent_dim,
-            hidden_dims=hidden_dims,
             image_size=image_size,
             checkpoint_path=checkpoint_path,
             logger=logger,
             set_weights=False,  # We will set weights (or initialize them) after adding the decoder
         )
 
-        if hidden_dims is not None:
-            if hidden_dims != self.hidden_dims:
-                raise ValueError(
-                    "Hidden dims provided to AE do not match those used in Encoder initialization."
-                )
-
         # Add Decoder
         self.decoder_input = nn.Linear(latent_dim, self.output_features)
-        modules = []
-        rev_hidden_dims = list(reversed(self.hidden_dims))
-        for i in range(len(rev_hidden_dims) - 1):
-            modules.append(
-                self.make_decoder_block(rev_hidden_dims[i], rev_hidden_dims[i + 1])
-            )
-        self.decoder = nn.Sequential(*modules)
-
-        self.final_layer = self._make_final_layer(rev_hidden_dims[-1])
+        s_d = image_size // 16
+        self.decoder = nn.Sequential(
+            self.make_decoder_block(
+                512, 512, kernel_size=1, padding=0, spatial_size=s_d
+            ),
+            nn.Upsample(scale_factor=2, mode="nearest"),
+            self.make_decoder_block(
+                512, 256, kernel_size=1, padding=0, spatial_size=(s_d := s_d * 2)
+            ),
+            nn.Upsample(scale_factor=2, mode="nearest"),
+            self.make_decoder_block(
+                256, 256, kernel_size=3, padding=1, spatial_size=(s_d := s_d * 2)
+            ),
+            self.make_decoder_block(
+                256, 128, kernel_size=3, padding=1, spatial_size=s_d
+            ),
+            self.make_decoder_block(
+                128, 128, kernel_size=3, padding=1, spatial_size=s_d
+            ),
+            self.make_decoder_block(
+                128, 64, kernel_size=3, padding=1, spatial_size=s_d
+            ),
+            nn.Upsample(scale_factor=2, mode="nearest"),
+            self.make_decoder_block(
+                64, 64, kernel_size=5, padding=2, spatial_size=(s_d := s_d * 2)
+            ),
+            nn.Upsample(scale_factor=2, mode="nearest"),
+            self.make_decoder_block(
+                64, 32, kernel_size=5, padding=2, spatial_size=(s_d := s_d * 2)
+            ),
+            self.make_decoder_block(32, 32, kernel_size=7, padding=3, spatial_size=s_d),
+            nn.Conv2d(32, 3, kernel_size=7, padding=3),
+        )
 
         # set weights
         if set_weights:
@@ -256,29 +291,23 @@ class AE(Encoder):
             self._freeze_encoder(freeze=True)
 
     @staticmethod
-    def make_decoder_block(in_channels: int, out_channels: int) -> nn.Module:
-        upsample = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode="nearest"),
+    def make_decoder_block(
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int,
+        padding: int,
+        spatial_size: int,
+    ) -> nn.Module:
+        return nn.Sequential(
             nn.Conv2d(
                 in_channels,
                 out_channels,
-                kernel_size=3,
-                padding=1,
+                kernel_size=kernel_size,
+                stride=1,
+                padding=padding,
             ),
-            nn.GroupNorm(32, out_channels),
             nn.ReLU(),
-        )
-        return upsample
-
-    @staticmethod
-    def _make_final_layer(last_dim: int) -> nn.Sequential:
-        return nn.Sequential(
-            nn.Upsample(scale_factor=2, mode="nearest"),
-            nn.Conv2d(last_dim, last_dim, kernel_size=3, padding=1),
-            nn.GroupNorm(32, last_dim),
-            nn.ReLU(),
-            nn.Conv2d(last_dim, out_channels=3, kernel_size=3, padding=1),
-            nn.Tanh(),
+            nn.LayerNorm([out_channels, spatial_size, spatial_size]),
         )
 
     def _freeze_encoder(self, freeze: bool = True) -> None:
@@ -313,8 +342,7 @@ class AE(Encoder):
         # make sure that your decoder_input, decoder, and final_layer are defined in subclasses
         output = self.decoder_input(latent_variables)
         output = output.view(-1, *self.encoder_output_shape)
-        output = self.decoder(output)
-        return self.final_layer(output)
+        return self.decoder(output)
 
     def forward(self, inputs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -392,8 +420,7 @@ class BetaVAE(AE):
         self,
         in_channels: int = 3,
         latent_dim: int = 768,
-        hidden_dims: Optional[List[int]] = None,
-        image_size: int = 128,
+        image_size: int = 256,
         checkpoint_path: Union[str, Path] = None,
         logger: Optional[Logger] = None,
         set_weights: bool = True,
@@ -403,7 +430,6 @@ class BetaVAE(AE):
         super().__init__(
             in_channels=in_channels,
             latent_dim=latent_dim,
-            hidden_dims=hidden_dims,
             image_size=image_size,
             checkpoint_path=None,
             logger=logger,
@@ -683,8 +709,7 @@ class BetaVAEScalingLLM(BetaVAE):
         self,
         in_channels: int = 3,
         latent_dim: int = 768,
-        hidden_dims: Optional[List[int]] = None,
-        image_size: int = 128,
+        image_size: int = 256,
         checkpoint_path: Union[str, Path] = None,
         logger: Optional[Logger] = None,
         vae_checkpoint: bool = False,
@@ -693,7 +718,6 @@ class BetaVAEScalingLLM(BetaVAE):
         super().__init__(
             in_channels=in_channels,
             latent_dim=latent_dim,
-            hidden_dims=hidden_dims,
             image_size=image_size,
             checkpoint_path=None,
             logger=logger,

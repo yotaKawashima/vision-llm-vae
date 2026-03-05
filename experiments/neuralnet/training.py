@@ -158,7 +158,7 @@ class DataParallelismTrainer:
             p for p in self.original_model.parameters() if p.requires_grad
         ]
         self.optimizer = torch.optim.AdamW(
-            params_to_optimize, lr=learning_rate, weight_decay=1e-2
+            params_to_optimize, lr=learning_rate, weight_decay=1e-6
         )
 
         # 4. Load previous training state (if available)
