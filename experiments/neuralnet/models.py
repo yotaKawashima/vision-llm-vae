@@ -339,7 +339,7 @@ class AE(Encoder):
             Reconstructed image tensor
         """
 
-        # make sure that your decoder_input, decoder, and final_layer are defined in subclasses
+        # make sure that your decoder_input and decoder are defined in subclasses
         output = self.decoder_input(latent_variables)
         output = output.view(-1, *self.encoder_output_shape)
         return self.decoder(output)

@@ -293,13 +293,10 @@ class AE(Encoder):
             DecoderBasicBlock.make_layer(128, 64, num_blocks=2, upsample_first=True),
             # mirror layer1 (2 blocks): 64 → 64, no spatial change
             DecoderBasicBlock.make_layer(64, 64, num_blocks=2, upsample_first=False),
-        )
-        # reverse stem: maxpool(stride=2) → conv1(7×7, stride=2, 64→3)
-        self.final_layer = nn.Sequential(
+            # reverse stem: maxpool(stride=2) → conv1(7×7, stride=2, 64→3)
             nn.Upsample(scale_factor=2, mode="nearest"),  # reverse maxpool
             nn.Upsample(scale_factor=2, mode="nearest"),  # reverse conv1 stride=2
-            nn.Conv2d(64, 3, kernel_size=7, padding=3, bias=False),  # reverse conv1
-            nn.Tanh(),
+            nn.Conv2d(64, 3, kernel_size=7, padding=3),  # reverse conv1
         )
 
         # set weights
@@ -351,8 +348,7 @@ class AE(Encoder):
         # make sure that your decoder_input, decoder, and final_layer are defined in subclasses
         output = self.decoder_input(latent_variables)
         output = output.view(-1, *self.encoder_output_shape)
-        output = self.decoder(output)
-        return self.final_layer(output)
+        return self.decoder(output)
 
     def forward(self, inputs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
