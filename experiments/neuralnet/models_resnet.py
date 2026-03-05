@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from torchvision.models import resnet50, ResNet50_Weights
+from torchvision.models import resnet18, ResNet18_Weights
 
 from .logger import Logger
 from .models_base import BaseModel
@@ -17,7 +17,7 @@ class Encoder(BaseModel):
 
     def __init__(
         self,
-        in_channels: int = 3,  # backwards compatibility, not actually used since ResNet50 always takes 3-channel input
+        in_channels: int = 3,  # backwards compatibility, not actually used since ResNet18 always takes 3-channel input
         latent_dim: int = 768,
         image_size: int = 224,
         checkpoint_path: Optional[Union[str, Path]] = None,
@@ -27,17 +27,17 @@ class Encoder(BaseModel):
 
         assert (
             in_channels == 3
-        ), "Currently only in_channels=3 is supported since we are using ResNet50 as the encoder backbone."
+        ), "Currently only in_channels=3 is supported since we are using ResNet18 as the encoder backbone."
         super().__init__(logger=logger)
 
         self.latent_dim = latent_dim
         self.image_size = image_size
 
-        # --- ResNet50 Encoder ---
+        # --- ResNet18 Encoder ---
         weights = (
-            ResNet50_Weights.IMAGENET1K_V1
+            ResNet18_Weights.IMAGENET1K_V1
         )  # use pretrained weights (can be updated later if needed)
-        backbone = resnet50(weights=weights)
+        backbone = resnet18(weights=weights)
 
         assert (
             image_size % 32 == 0
@@ -46,16 +46,14 @@ class Encoder(BaseModel):
             image_size // 32
         )  # spatial size after layer4 (e.g. 128→4, 224→7, 256→8)
 
-        # backbone without avgpool (output: 2048 x stem_size x stem_size)
+        # backbone without avgpool (output: 512 x stem_size x stem_size)
         self.encoder = nn.Sequential(*list(backbone.children())[:-2])
 
-        self.encoder_output_shape = (2048, stem_size, stem_size)
-        self.output_features = 2048 * stem_size * stem_size
+        self.encoder_output_shape = (512, stem_size, stem_size)
+        self.output_features = 512 * stem_size * stem_size
 
         # Latent space mapping (AE directly connects to latent_dim)
-        self.fc_mu = nn.Sequential(
-            nn.Linear(self.output_features, latent_dim), nn.Dropout(p=0.1)
-        )
+        self.fc_mu = nn.Linear(self.output_features, latent_dim)
 
         # set weights
         if set_weights:
@@ -191,54 +189,39 @@ class Encoder(BaseModel):
             return {"loss": output}
 
 
-class DecoderBottleneck(nn.Module):
+class DecoderBasicBlock(nn.Module):
     """
-    Decoder block mirroring ResNet50's Bottleneck, with optional ×2 upsampling.
-    Mirrors the 1×1 → 3×3 → 1×1 structure with a residual skip connection.
+    Decoder block mirroring ResNet18's BasicBlock, with optional ×2 upsampling.
+    Mirrors the 3×3 → 3×3 structure with a residual skip connection.
     """
 
     def __init__(
         self,
         in_channels: int,
-        bottleneck_channels: int,
         out_channels: int,
         upsample: bool = False,
     ) -> None:
         super().__init__()
 
-        # 1×1 compress
-        self.conv1 = nn.Conv2d(
-            in_channels, bottleneck_channels, kernel_size=1, bias=False
-        )
-        self.bn1 = nn.BatchNorm2d(bottleneck_channels)
-
         # 3×3 spatial (with optional ×2 upsample)
         if upsample:
-            self.conv2: nn.Module = nn.Sequential(
+            self.conv1: nn.Module = nn.Sequential(
                 nn.Upsample(scale_factor=2, mode="nearest"),
                 nn.Conv2d(
-                    bottleneck_channels,
-                    bottleneck_channels,
-                    kernel_size=3,
-                    padding=1,
-                    bias=False,
+                    in_channels, out_channels, kernel_size=3, padding=1, bias=False
                 ),
             )
         else:
-            self.conv2 = nn.Conv2d(
-                bottleneck_channels,
-                bottleneck_channels,
-                kernel_size=3,
-                padding=1,
-                bias=False,
+            self.conv1 = nn.Conv2d(
+                in_channels, out_channels, kernel_size=3, padding=1, bias=False
             )
-        self.bn2 = nn.BatchNorm2d(bottleneck_channels)
+        self.bn1 = nn.BatchNorm2d(out_channels)
 
-        # 1×1 expand
-        self.conv3 = nn.Conv2d(
-            bottleneck_channels, out_channels, kernel_size=1, bias=False
+        # 3×3 spatial
+        self.conv2 = nn.Conv2d(
+            out_channels, out_channels, kernel_size=3, padding=1, bias=False
         )
-        self.bn3 = nn.BatchNorm2d(out_channels)
+        self.bn2 = nn.BatchNorm2d(out_channels)
 
         self.relu = nn.ReLU(inplace=True)
 
@@ -258,29 +241,21 @@ class DecoderBottleneck(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         identity = self.skip(x)
         out = self.relu(self.bn1(self.conv1(x)))
-        out = self.relu(self.bn2(self.conv2(out)))
-        out = self.bn3(self.conv3(out))
+        out = self.bn2(self.conv2(out))
         return self.relu(out + identity)
 
     @staticmethod
     def make_layer(
         in_channels: int,
-        bottleneck_channels: int,
         out_channels: int,
         num_blocks: int,
         upsample_first: bool = False,
     ) -> nn.Sequential:
         layers: List[nn.Module] = [
-            DecoderBottleneck(
-                in_channels, bottleneck_channels, out_channels, upsample=upsample_first
-            )
+            DecoderBasicBlock(in_channels, out_channels, upsample=upsample_first)
         ]
         for _ in range(1, num_blocks):
-            layers.append(
-                DecoderBottleneck(
-                    out_channels, bottleneck_channels, out_channels, upsample=False
-                )
-            )
+            layers.append(DecoderBasicBlock(out_channels, out_channels, upsample=False))
         return nn.Sequential(*layers)
 
 
@@ -305,27 +280,19 @@ class AE(Encoder):
             set_weights=False,  # We will set weights (or initialize them) after adding the decoder
         )
 
-        # --- ResNet50 Decoder (mirrors encoder structure in reverse) ---
-        # latent → 2048×(s×s) → 1024×(2s×2s) → 512×(4s×4s) → 256×(8s×8s) → 64×(8s×8s) → 3×image_size²
+        # --- ResNet18 Decoder (mirrors encoder structure in reverse) ---
+        # latent → 512×(s×s) → 256×(2s×2s) → 128×(4s×4s) → 64×(8s×8s) → 64×(8s×8s) → 3×image_size²
         # where s = image_size // 32
         self.decoder_input = nn.Linear(latent_dim, self.output_features)
         self.decoder = nn.Sequential(
-            # mirror layer4 (planes=512, 3 blocks): 2048 → 1024, spatial ×2
-            DecoderBottleneck.make_layer(
-                2048, 512, 1024, num_blocks=3, upsample_first=True
-            ),
-            # mirror layer3 (planes=256, 6 blocks): 1024 → 512, spatial ×2
-            DecoderBottleneck.make_layer(
-                1024, 256, 512, num_blocks=6, upsample_first=True
-            ),
-            # mirror layer2 (planes=128, 4 blocks): 512 → 256, spatial ×2
-            DecoderBottleneck.make_layer(
-                512, 128, 256, num_blocks=4, upsample_first=True
-            ),
-            # mirror layer1 (planes=64, 3 blocks): 256 → 64, no spatial change
-            DecoderBottleneck.make_layer(
-                256, 64, 64, num_blocks=3, upsample_first=False
-            ),
+            # mirror layer4 (2 blocks): 512 → 256, spatial ×2
+            DecoderBasicBlock.make_layer(512, 256, num_blocks=2, upsample_first=True),
+            # mirror layer3 (2 blocks): 256 → 128, spatial ×2
+            DecoderBasicBlock.make_layer(256, 128, num_blocks=2, upsample_first=True),
+            # mirror layer2 (2 blocks): 128 → 64, spatial ×2
+            DecoderBasicBlock.make_layer(128, 64, num_blocks=2, upsample_first=True),
+            # mirror layer1 (2 blocks): 64 → 64, no spatial change
+            DecoderBasicBlock.make_layer(64, 64, num_blocks=2, upsample_first=False),
         )
         # reverse stem: maxpool(stride=2) → conv1(7×7, stride=2, 64→3)
         self.final_layer = nn.Sequential(
@@ -349,7 +316,7 @@ class AE(Encoder):
             else:
                 # Case 2: no checkpoint provided, initialize entire AE with random weights.
                 self._log_info(
-                    "No checkpoint provided, initializing entire AE (ResNet50 with IMAGENET1K_V1)."
+                    "No checkpoint provided, initializing entire AE (ResNet18 with IMAGENET1K_V1)."
                 )
 
     def _freeze_encoder(self, freeze: bool = True) -> None:
