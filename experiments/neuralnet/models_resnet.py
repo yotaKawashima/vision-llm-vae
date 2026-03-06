@@ -329,6 +329,8 @@ class AE(Encoder):
             param.requires_grad = not freeze
         for param in self.fc_mu.parameters():
             param.requires_grad = not freeze
+        if freeze:
+            self.encoder.eval()  # set to eval mode when frozen to disable dropout/batchnorm updates
 
     def decode(self, latent_variables: torch.Tensor) -> torch.Tensor:
         """
