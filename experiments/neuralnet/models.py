@@ -56,6 +56,7 @@ class Encoder(BaseModel):
             self.make_encoder_block(
                 512, 512, kernel_size=1, padding=0, spatial_size=s // 2
             ),
+            nn.AdaptiveAvgPool2d(1),
         )
 
         # compute shape by doing one forward pass
@@ -247,6 +248,7 @@ class AE(Encoder):
         self.decoder_input = nn.Linear(latent_dim, self.output_features)
         s_d = image_size // 16
         self.decoder = nn.Sequential(
+            nn.Upsample(size=(s_d, s_d), mode="nearest"),
             self.make_decoder_block(
                 512, 512, kernel_size=1, padding=0, spatial_size=s_d
             ),
