@@ -279,6 +279,7 @@ class AE(Encoder):
             ),
             self.make_decoder_block(32, 32, kernel_size=7, padding=3, spatial_size=s_d),
             nn.Conv2d(32, 3, kernel_size=7, padding=3),
+            nn.tanh(),
         )
 
         # set weights
@@ -325,8 +326,17 @@ class AE(Encoder):
             param.requires_grad = not freeze
         for param in self.fc_mu.parameters():
             param.requires_grad = not freeze
+        self._encoder_frozen = freeze
         if freeze:
-            self.encoder.eval()  # just in case
+            self.encoder.eval()
+            self.fc_mu.eval()
+
+    def train(self, mode: bool = True):
+        super().train(mode)
+        if mode and getattr(self, "_encoder_frozen", False):
+            self.encoder.eval()
+            self.fc_mu.eval()
+        return self
 
     def decode(self, latent_variables: torch.Tensor) -> torch.Tensor:
         """
@@ -766,6 +776,7 @@ class BetaVAEScalingLLM(BetaVAE):
         """
         self._freeze_encoder(freeze=freeze)
         self._freeze_decoder(freeze=freeze)
+        self._vae_frozen = freeze
 
     def _freeze_encoder(self, freeze: bool = True) -> None:
         """
@@ -781,6 +792,10 @@ class BetaVAEScalingLLM(BetaVAE):
             param.requires_grad = not freeze
         for param in self.fc_logvar.parameters():
             param.requires_grad = not freeze
+        if freeze:
+            self.encoder.eval()
+            self.fc_mu.eval()
+            self.fc_logvar.eval()
 
     def _freeze_decoder(self, freeze: bool = True) -> None:
         """
@@ -796,6 +811,19 @@ class BetaVAEScalingLLM(BetaVAE):
             param.requires_grad = not freeze
         for param in self.final_layer.parameters():
             param.requires_grad = not freeze
+        if freeze:
+            self.decoder_input.eval()
+            self.decoder.eval()
+
+    def train(self, mode: bool = True):
+        super().train(mode)
+        if mode and getattr(self, "_vae_frozen", False):
+            self.encoder.eval()
+            self.fc_mu.eval()
+            self.fc_logvar.eval()
+            self.decoder_input.eval()
+            self.decoder.eval()
+        return self
 
     def forward(self, inputs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
