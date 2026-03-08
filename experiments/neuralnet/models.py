@@ -325,6 +325,8 @@ class AE(Encoder):
             param.requires_grad = not freeze
         for param in self.fc_mu.parameters():
             param.requires_grad = not freeze
+        if freeze:
+            self.encoder.eval()  # just in case
 
     def decode(self, latent_variables: torch.Tensor) -> torch.Tensor:
         """
