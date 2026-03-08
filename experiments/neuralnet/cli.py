@@ -121,14 +121,14 @@ class CommandLineInterface:
                 h5_path=config.coco_doerig_h5_path,
                 split="train",
                 embedding_key="all_mpnet_base_v2_mean_embeddings",
-                img_transform=config.img_transform_augmentation_h5,
+                img_transform=config.img_transform_train_h5,
                 logger=self.logger,
             )
             val_dataset = CocoH5Dataset(
                 h5_path=config.coco_doerig_h5_path,
                 split="val",
                 embedding_key="all_mpnet_base_v2_mean_embeddings",
-                img_transform=config.img_transform_h5,
+                img_transform=config.img_transform_val_h5,
                 logger=self.logger,
             )
         else:
@@ -153,9 +153,9 @@ class CommandLineInterface:
 
             # use data augmentaiton for training data and no augmentation for validation data
             train_dataset = ApplyTransformSubset(
-                train_subset, config.img_transform_augmentation
+                train_subset, config.img_transform_train
             )
-            val_dataset = ApplyTransformSubset(val_subset, config.img_transform)
+            val_dataset = ApplyTransformSubset(val_subset, config.img_transform_val)
 
         # data loader
         train_dataloader = torch.utils.data.DataLoader(
