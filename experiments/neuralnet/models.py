@@ -279,7 +279,7 @@ class AE(Encoder):
             ),
             self.make_decoder_block(32, 32, kernel_size=7, padding=3, spatial_size=s_d),
             nn.Conv2d(32, 3, kernel_size=7, padding=3),
-            nn.tanh(),
+            nn.Tanh(),
         )
 
         # set weights
