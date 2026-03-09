@@ -104,7 +104,7 @@ if resnet_flag:
     img_mean = [0.485, 0.456, 0.406]
     img_std = [0.229, 0.224, 0.225]
 else:
-    img_resize = 256
+    img_resize = 128
     img_mean = [0.5, 0.5, 0.5]
     img_std = [0.5, 0.5, 0.5]
 
@@ -140,10 +140,10 @@ if model_type in ["encoder"]:
         [
             T.ToTensor(),  # convert uint8 HWC [0, 255] to float CHW [0.0, 1.0]
             T.Resize((img_resize, img_resize)),
-            # T.RandomAffine(degrees=2, translate=(0.05, 0.05)),
-            # T.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),
-            # T.RandomGrayscale(p=0.05),
-            # T.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 2.0)),
+            T.RandomAffine(degrees=2, translate=(0.05, 0.05)),
+            T.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),
+            T.RandomGrayscale(p=0.05),
+            T.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 2.0)),
             T.Normalize(mean=img_mean, std=img_std),
         ]
     )
