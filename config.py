@@ -26,15 +26,15 @@ batch_size = 128
 learning_rate = 0.0005
 clip_grad_norm = 1.0
 ###### Model ######
-model_type = "ae"  # "encoder", "ae", "beta_vae", "beta_vae_llm"
-resnet_flag = True
+model_type = "beta_vae"  # "encoder", "ae", "beta_vae", "beta_vae_llm"
+resnet_flag = False
 latent_dim = text_embedding_dim
 # checkpoint_path = None
 checkpoint_path = Path(
-    "/mnt/data/checkpoints/resnet18_encoder_loss_norm_and_cosine_similarity_smoothL1_alpha10.0/cocoDoerig/run_0/checkpoint_epoch30.ckpt"
+    "/mnt/data/checkpoints/ae_loss_l2/cocoDoerig/run_0/checkpoint_epoch25.ckpt"
 )  # or None
-encoder_checkpoint = True  # whether to initialize the encoder with the checkpoint from the encoder model (only applicable for ae model)
-ae_checkpoint = False  # whether to initialize the ae model with the checkpoint from the ae model (only applicable for beta_vae model)
+encoder_checkpoint = False  # whether to initialize the encoder with the checkpoint from the encoder model (only applicable for ae model)
+ae_checkpoint = True  # whether to initialize the ae model with the checkpoint from the ae model (only applicable for beta_vae model)
 vae_checkpoint = False  # whether to initialize the vae model with the checkpoint from the vae model (only applicable for beta_vae_llm model)
 last_checkpoint_path = None  # for activation extraction
 loss_type = None
@@ -55,10 +55,10 @@ MODEL_CONFIGS = {
     },
     "beta_vae": {
         "loss_type": "llm_alignment",  # or "standard"
-        "beta": 1.0,  # beta for KL divergence loss
+        "beta": 0.1,  # beta for KL divergence loss
         "recon_loss_type": "l2",
         "llm_alignment_loss_type": "cosine_similarity",
-        "gamma": 5.0,  # weight for llm alignment loss when loss_type is "llm_alignment"
+        "gamma": 1.0,  # weight for llm alignment loss when loss_type is "llm_alignment"
     },
     "beta_vae_llm": {
         "loss_type": "l2",
