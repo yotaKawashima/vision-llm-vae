@@ -26,13 +26,13 @@ batch_size = 128
 learning_rate = 0.0005
 clip_grad_norm = 1.0
 ###### Model ######
-model_type = "ae"  # "encoder", "ae", "beta_vae", "beta_vae_llm"
-resnet_flag = False
+model_type = "encoder"  # "encoder", "ae", "beta_vae", "beta_vae_llm"
+resnet_flag = True
 latent_dim = text_embedding_dim
-# checkpoint_path = None
-checkpoint_path = Path(
-    "/mnt/data/checkpoints/encoder_loss_norm_and_cosine_similarity_smoothL1_alpha10.0/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
-)  # or None
+checkpoint_path = None
+# checkpoint_path = Path(
+#     "/mnt/data/checkpoints/encoder_loss_norm_and_cosine_similarity_smoothL1_alpha10.0/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
+# )  # or None
 encoder_checkpoint = True  # whether to initialize the encoder with the checkpoint from the encoder model (only applicable for ae model)
 ae_checkpoint = False  # whether to initialize the ae model with the checkpoint from the ae model (only applicable for beta_vae model)
 vae_checkpoint = False  # whether to initialize the vae model with the checkpoint from the vae model (only applicable for beta_vae_llm model)
@@ -120,11 +120,11 @@ if model_type in ["encoder"]:
     img_transform_train = T.Compose(
         [
             T.Resize((img_resize, img_resize)),
-            # T.RandomAffine(degrees=2, translate=(0.05, 0.05)),
-            # T.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),
-            # T.RandomGrayscale(p=0.05),
-            # T.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 2.0)),
-            # T.ToTensor(),
+            T.RandomAffine(degrees=2, translate=(0.05, 0.05)),
+            T.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),
+            T.RandomGrayscale(p=0.05),
+            T.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 2.0)),
+            T.ToTensor(),
             T.Normalize(mean=img_mean, std=img_std),
         ]
     )
