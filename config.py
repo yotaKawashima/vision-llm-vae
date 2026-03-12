@@ -91,7 +91,17 @@ elif model_type == "beta_vae":
             + f"_llm_alignment_loss_{current_cfg['llm_alignment_loss_type']}"
             + f"_gamma{current_cfg['gamma']}"
         )
-elif model_type in ["ae", "beta_vae_llm"]:
+    else:
+        assert (
+            not ae_checkpoint
+        ), "ae_checkpoint can only be True when loss_type is 'llm_alignment' for beta_vae model."
+        full_model_name = "vanilla_" + full_model_name
+
+elif model_type == "ae":
+    if not encoder_checkpoint:
+        full_model_name = "vanilla_" + full_model_name
+
+elif model_type in ["beta_vae_llm"]:
     pass
 else:
     raise ValueError(
