@@ -27,7 +27,7 @@ learning_rate = 0.0005
 clip_grad_norm = 1.0
 ###### Model ######
 model_type = "ae"  # "encoder", "ae", "beta_vae", "beta_vae_llm"
-resnet_flag = True
+resnet_flag = False
 latent_dim = text_embedding_dim
 checkpoint_path = None
 # checkpoint_path = Path(
@@ -115,8 +115,8 @@ if resnet_flag:
     img_std = [0.229, 0.224, 0.225]
 else:
     img_resize = 128
-    img_mean = [0.5, 0.5, 0.5]
-    img_std = [0.5, 0.5, 0.5]
+    img_mean = [0.485, 0.456, 0.406]
+    img_std = [0.229, 0.224, 0.225]
 
 if model_type in ["encoder"]:
     # PIL image

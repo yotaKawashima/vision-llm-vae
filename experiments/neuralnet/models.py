@@ -250,11 +250,11 @@ class AE(Encoder):
         self.decoder = nn.Sequential(
             nn.Upsample(size=(s_d, s_d), mode="nearest"),
             self.make_decoder_block(
-                512, 512, kernel_size=1, padding=0, spatial_size=s_d
+                512, 512, kernel_size=3, padding=1, spatial_size=s_d
             ),
             nn.Upsample(scale_factor=2, mode="nearest"),
             self.make_decoder_block(
-                512, 256, kernel_size=1, padding=0, spatial_size=(s_d := s_d * 2)
+                512, 256, kernel_size=3, padding=1, spatial_size=(s_d := s_d * 2)
             ),
             nn.Upsample(scale_factor=2, mode="nearest"),
             self.make_decoder_block(
@@ -279,7 +279,6 @@ class AE(Encoder):
             ),
             self.make_decoder_block(32, 32, kernel_size=7, padding=3, spatial_size=s_d),
             nn.Conv2d(32, 3, kernel_size=7, padding=3),
-            nn.Tanh(),
         )
 
         # set weights
@@ -310,7 +309,7 @@ class AE(Encoder):
                 padding=padding,
             ),
             nn.ReLU(),
-            nn.LayerNorm([out_channels, spatial_size, spatial_size]),
+            # nn.LayerNorm([out_channels, spatial_size, spatial_size]),
         )
 
     def _freeze_encoder(self, freeze: bool = True) -> None:
