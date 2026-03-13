@@ -26,7 +26,7 @@ batch_size = 128
 learning_rate = 0.0005
 clip_grad_norm = 1.0
 ###### Model ######
-model_type = "ae"  # "encoder", "ae", "beta_vae", "beta_vae_llm"
+model_type = "encoder"  # "encoder", "ae", "beta_vae", "beta_vae_llm"
 resnet_flag = False
 latent_dim = text_embedding_dim
 checkpoint_path = None
