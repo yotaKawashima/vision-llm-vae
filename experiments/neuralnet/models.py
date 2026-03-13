@@ -56,7 +56,7 @@ class Encoder(BaseModel):
             self.make_encoder_block(
                 512, 512, kernel_size=1, padding=0, spatial_size=s // 2
             ),
-            nn.AdaptiveAvgPool2d(1),
+            nn.AdaptiveAvgPool2d(2),
         )
 
         # compute shape by doing one forward pass
@@ -247,38 +247,41 @@ class AE(Encoder):
         # Add Decoder
         self.decoder_input = nn.Linear(latent_dim, self.output_features)
         s_d = image_size // 16
+        group_size = 4
         self.decoder = nn.Sequential(
-            nn.Upsample(size=(s_d, s_d), mode="nearest"),
+            nn.Upsample(size=(s_d, s_d), mode="bilinear"),
             self.make_decoder_block(
-                512, 512, kernel_size=3, padding=1, spatial_size=s_d
+                512, 512, kernel_size=3, padding=1, num_groups=512 // group_size
             ),
-            nn.Upsample(scale_factor=2, mode="nearest"),
+            nn.Upsample(scale_factor=2, mode="bilinear"),
             self.make_decoder_block(
-                512, 256, kernel_size=3, padding=1, spatial_size=(s_d := s_d * 2)
+                512, 256, kernel_size=3, padding=1, num_groups=256 // group_size
             ),
-            nn.Upsample(scale_factor=2, mode="nearest"),
+            nn.Upsample(scale_factor=2, mode="bilinear"),
             self.make_decoder_block(
-                256, 256, kernel_size=3, padding=1, spatial_size=(s_d := s_d * 2)
-            ),
-            self.make_decoder_block(
-                256, 128, kernel_size=3, padding=1, spatial_size=s_d
+                256, 256, kernel_size=3, padding=1, num_groups=256 // group_size
             ),
             self.make_decoder_block(
-                128, 128, kernel_size=3, padding=1, spatial_size=s_d
+                256, 128, kernel_size=3, padding=1, num_groups=128 // group_size
             ),
             self.make_decoder_block(
-                128, 64, kernel_size=3, padding=1, spatial_size=s_d
+                128, 128, kernel_size=3, padding=1, num_groups=128 // group_size
             ),
-            nn.Upsample(scale_factor=2, mode="nearest"),
             self.make_decoder_block(
-                64, 64, kernel_size=5, padding=2, spatial_size=(s_d := s_d * 2)
+                128, 64, kernel_size=3, padding=1, num_groups=64 // group_size
             ),
-            nn.Upsample(scale_factor=2, mode="nearest"),
+            nn.Upsample(scale_factor=2, mode="bilinear"),
             self.make_decoder_block(
-                64, 32, kernel_size=5, padding=2, spatial_size=(s_d := s_d * 2)
+                64, 64, kernel_size=5, padding=2, num_groups=64 // group_size
             ),
-            self.make_decoder_block(32, 32, kernel_size=7, padding=3, spatial_size=s_d),
-            nn.Conv2d(32, 3, kernel_size=7, padding=3),
+            nn.Upsample(scale_factor=2, mode="bilinear"),
+            self.make_decoder_block(
+                64, 32, kernel_size=5, padding=2, num_groups=32 // group_size
+            ),
+            self.make_decoder_block(
+                32, 32, kernel_size=7, padding=3, num_groups=32 // group_size
+            ),
+            nn.Conv2d(32, 3, kernel_size=7, padding=3, padding_mode="reflect"),
         )
 
         # set weights
@@ -298,7 +301,7 @@ class AE(Encoder):
         out_channels: int,
         kernel_size: int,
         padding: int,
-        spatial_size: int,
+        num_groups: int,
     ) -> nn.Module:
         return nn.Sequential(
             nn.Conv2d(
@@ -307,9 +310,10 @@ class AE(Encoder):
                 kernel_size=kernel_size,
                 stride=1,
                 padding=padding,
+                padding_mode="reflect",
             ),
+            nn.GroupNorm(num_groups, out_channels),
             nn.ReLU(),
-            # nn.LayerNorm([out_channels, spatial_size, spatial_size]),
         )
 
     def _freeze_encoder(self, freeze: bool = True) -> None:
