@@ -11,181 +11,6 @@ from .logger import Logger
 from .models_base import BaseModel
 
 
-class Decoder(BaseModel):
-    """
-    Standalone decoder: maps latent vectors (e.g. LLM embeddings) directly to images.
-    This is the base class for all image-generating models.
-    """
-
-    # Fixed by encoder architecture: AdaptiveAvgPool2d(2) with 512 output channels.
-    # All subclasses share this bottleneck shape.
-    _ENC_OUT_CHANNELS: int = 512
-    _ENC_OUT_SPATIAL: int = 2
-
-    def __init__(
-        self,
-        latent_dim: int = 768,
-        image_size: int = 128,
-        checkpoint_path: Optional[Union[str, Path]] = None,
-        logger: Optional[Logger] = None,
-        set_weights: bool = True,
-    ) -> None:
-        super().__init__(logger=logger)
-
-        self.latent_dim = latent_dim
-        self.image_size = image_size
-
-        # Shape of the encoder bottleneck that this decoder expects as input.
-        self.encoder_output_shape: Tuple[int, int, int] = (
-            self._ENC_OUT_CHANNELS,
-            self._ENC_OUT_SPATIAL,
-            self._ENC_OUT_SPATIAL,
-        )
-        self.output_features: int = (
-            self._ENC_OUT_CHANNELS * self._ENC_OUT_SPATIAL * self._ENC_OUT_SPATIAL
-        )
-
-        # Build decoder
-        self.decoder_input = nn.Linear(latent_dim, self.output_features)
-        s_d = image_size // 16
-        group_size = 4
-        self.decoder = nn.Sequential(
-            nn.Upsample(size=(s_d, s_d), mode="bilinear"),
-            self.make_decoder_block(
-                512, 512, kernel_size=3, padding=1, num_groups=512 // group_size
-            ),
-            nn.Upsample(scale_factor=2, mode="bilinear"),
-            self.make_decoder_block(
-                512, 256, kernel_size=3, padding=1, num_groups=256 // group_size
-            ),
-            nn.Upsample(scale_factor=2, mode="bilinear"),
-            self.make_decoder_block(
-                256, 256, kernel_size=3, padding=1, num_groups=256 // group_size
-            ),
-            self.make_decoder_block(
-                256, 128, kernel_size=3, padding=1, num_groups=128 // group_size
-            ),
-            self.make_decoder_block(
-                128, 128, kernel_size=3, padding=1, num_groups=128 // group_size
-            ),
-            self.make_decoder_block(
-                128, 64, kernel_size=3, padding=1, num_groups=64 // group_size
-            ),
-            nn.Upsample(scale_factor=2, mode="bilinear"),
-            self.make_decoder_block(
-                64, 64, kernel_size=5, padding=2, num_groups=64 // group_size
-            ),
-            nn.Upsample(scale_factor=2, mode="bilinear"),
-            self.make_decoder_block(
-                64, 32, kernel_size=5, padding=2, num_groups=32 // group_size
-            ),
-            self.make_decoder_block(
-                32, 32, kernel_size=7, padding=3, num_groups=32 // group_size
-            ),
-            nn.Conv2d(32, 3, kernel_size=7, padding=3, padding_mode="reflect"),
-        )
-
-        if set_weights:
-            if checkpoint_path is None:
-                raise ValueError(
-                    "checkpoint_path must be provided if set_weights is True."
-                )
-            self._set_weights(checkpoint_path=checkpoint_path)
-
-    @staticmethod
-    def make_decoder_block(
-        in_channels: int,
-        out_channels: int,
-        kernel_size: int,
-        padding: int,
-        num_groups: int,
-    ) -> nn.Module:
-        return nn.Sequential(
-            nn.Conv2d(
-                in_channels,
-                out_channels,
-                kernel_size=kernel_size,
-                stride=1,
-                padding=padding,
-                padding_mode="reflect",
-            ),
-            nn.GroupNorm(num_groups, out_channels),
-            nn.ReLU(),
-        )
-
-    def decode(self, latent_variables: torch.Tensor) -> torch.Tensor:
-        """
-        Decode latent variables into a reconstructed image.
-
-        Parameters
-        ----------
-        latent_variables: torch.Tensor (batch x latent_dim)
-        Returns
-        -------
-        torch.Tensor (batch x 3 x H x W)
-        """
-        output = self.decoder_input(latent_variables)
-        output = output.view(-1, *self.encoder_output_shape)
-        return self.decoder(output)
-
-    def reconstruction_loss(
-        self, img: torch.Tensor, img_hat: torch.Tensor, recon_loss_type: str = "l2"
-    ) -> torch.Tensor:
-        """
-        Compute reconstruction loss between target and predicted image.
-
-        Parameters
-        ----------
-        img : torch.Tensor (batch x channel x height x width)
-        img_hat : torch.Tensor (batch x channel x height x width)
-        recon_loss_type: str  "l1" or "l2"
-        Returns
-        -------
-        torch.Tensor
-        """
-        if recon_loss_type == "l1":
-            return F.l1_loss(img, img_hat, reduction="mean")
-        elif recon_loss_type == "l2":
-            return F.mse_loss(img, img_hat, reduction="mean")
-        else:
-            raise ValueError(f"Unknown recon_loss_type: {recon_loss_type}")
-
-    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass: LLM embedding → reconstructed image.
-
-        Parameters
-        ----------
-        inputs: torch.Tensor (batch x latent_dim)
-        Returns
-        -------
-        torch.Tensor (batch x 3 x H x W)
-        """
-        return self.decode(inputs)
-
-    def compute_loss(self, **kwargs) -> dict:
-        """
-        Compute reconstruction loss for standalone decoder training (LLM → image).
-
-        Parameters
-        ----------
-        **kwargs:
-            img: torch.Tensor (batch x channel x height x width)
-                Target image
-            text_embedding: torch.Tensor (batch x latent_dim)
-                LLM embedding used as input
-            loss_type: str  (default "l2")
-        Returns
-        -------
-        dict
-        """
-        img = kwargs.get("img")
-        text_embedding = kwargs.get("text_embedding")
-        loss_type = kwargs.get("loss_type", "l2")
-        img_hat = self.forward(text_embedding)
-        return {"loss": self.reconstruction_loss(img, img_hat, recon_loss_type=loss_type)}
-
-
 class Encoder(BaseModel):
     """
     Standalone encoder: maps images to latent vectors.
@@ -203,11 +28,19 @@ class Encoder(BaseModel):
 
         super().__init__(logger=logger)
 
+        self._build_encoder(in_channels, latent_dim, image_size)
+
+        if set_weights:
+            self._set_weights(checkpoint_path=checkpoint_path)
+
+    def _build_encoder(
+        self, in_channels: int, latent_dim: int, image_size: int
+    ) -> None:
+        """Build encoder layers. Called by __init__ and AE.__init__."""
         self.latent_dim = latent_dim
         self.image_size = image_size
         self.hidden_dims = [32, 64, 128, 256, 512]
 
-        # Track spatial size to create LayerNorm([C, H, W]) at each block
         s = image_size
         self.encoder = nn.Sequential(
             self.make_encoder_block(
@@ -244,11 +77,7 @@ class Encoder(BaseModel):
             self.encoder_output_shape = out.shape[1:]
             self.output_features = out.flatten(1).shape[1]
 
-        # Latent space mapping
         self.fc_mu = nn.Linear(self.output_features, latent_dim)
-
-        if set_weights:
-            self._set_weights(checkpoint_path=checkpoint_path)
 
     @staticmethod
     def make_encoder_block(
@@ -269,6 +98,24 @@ class Encoder(BaseModel):
             nn.ReLU(),
             nn.LayerNorm([out_channels, spatial_size, spatial_size]),
         )
+
+    def _freeze_encoder(self, freeze: bool = True) -> None:
+        """Freeze or unfreeze the encoder weights."""
+        for param in self.encoder.parameters():
+            param.requires_grad = not freeze
+        for param in self.fc_mu.parameters():
+            param.requires_grad = not freeze
+        self._encoder_frozen = freeze
+        if freeze:
+            self.encoder.eval()
+            self.fc_mu.eval()
+
+    def train(self, mode: bool = True):
+        super().train(mode)
+        if mode and getattr(self, "_encoder_frozen", False):
+            self.encoder.eval()
+            self.fc_mu.eval()
+        return self
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         """
@@ -385,9 +232,185 @@ class Encoder(BaseModel):
             return {"loss": output}
 
 
-class AE(Decoder):
+class Decoder(BaseModel):
     """
-    Autoencoder: adds an encoder frontend to the Decoder base.
+    Standalone decoder: maps latent vectors (e.g. LLM embeddings) directly to images.
+    This is the base class for all image-generating models.
+    """
+
+    # Fixed by encoder architecture: AdaptiveAvgPool2d(2) with 512 output channels.
+    # All subclasses share this bottleneck shape.
+    _ENC_OUT_CHANNELS: int = 512
+    _ENC_OUT_SPATIAL: int = 2
+
+    def __init__(
+        self,
+        latent_dim: int = 768,
+        image_size: int = 128,
+        checkpoint_path: Optional[Union[str, Path]] = None,
+        logger: Optional[Logger] = None,
+        set_weights: bool = True,
+    ) -> None:
+        super().__init__(logger=logger)
+
+        self._build_decoder(latent_dim, image_size)
+
+        if set_weights:
+            if checkpoint_path is None:
+                raise ValueError(
+                    "checkpoint_path must be provided if set_weights is True."
+                )
+            self._set_weights(checkpoint_path=checkpoint_path)
+
+    def _build_decoder(self, latent_dim: int, image_size: int) -> None:
+        """Build decoder layers. Called by __init__ and AE.__init__."""
+        self.encoder_output_shape: Tuple[int, int, int] = (
+            self._ENC_OUT_CHANNELS,
+            self._ENC_OUT_SPATIAL,
+            self._ENC_OUT_SPATIAL,
+        )
+        self.output_features: int = (
+            self._ENC_OUT_CHANNELS * self._ENC_OUT_SPATIAL * self._ENC_OUT_SPATIAL
+        )
+
+        self.decoder_input = nn.Linear(latent_dim, self.output_features)
+        s_d = image_size // 16
+        group_size = 4
+        self.decoder = nn.Sequential(
+            nn.Upsample(size=(s_d, s_d), mode="bilinear"),
+            self.make_decoder_block(
+                512, 512, kernel_size=3, padding=1, num_groups=512 // group_size
+            ),
+            nn.Upsample(scale_factor=2, mode="bilinear"),
+            self.make_decoder_block(
+                512, 256, kernel_size=3, padding=1, num_groups=256 // group_size
+            ),
+            nn.Upsample(scale_factor=2, mode="bilinear"),
+            self.make_decoder_block(
+                256, 256, kernel_size=3, padding=1, num_groups=256 // group_size
+            ),
+            self.make_decoder_block(
+                256, 128, kernel_size=3, padding=1, num_groups=128 // group_size
+            ),
+            self.make_decoder_block(
+                128, 128, kernel_size=3, padding=1, num_groups=128 // group_size
+            ),
+            self.make_decoder_block(
+                128, 64, kernel_size=3, padding=1, num_groups=64 // group_size
+            ),
+            nn.Upsample(scale_factor=2, mode="bilinear"),
+            self.make_decoder_block(
+                64, 64, kernel_size=5, padding=2, num_groups=64 // group_size
+            ),
+            nn.Upsample(scale_factor=2, mode="bilinear"),
+            self.make_decoder_block(
+                64, 32, kernel_size=5, padding=2, num_groups=32 // group_size
+            ),
+            self.make_decoder_block(
+                32, 32, kernel_size=7, padding=3, num_groups=32 // group_size
+            ),
+            nn.Conv2d(32, 3, kernel_size=7, padding=3, padding_mode="reflect"),
+        )
+
+    @staticmethod
+    def make_decoder_block(
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int,
+        padding: int,
+        num_groups: int,
+    ) -> nn.Module:
+        return nn.Sequential(
+            nn.Conv2d(
+                in_channels,
+                out_channels,
+                kernel_size=kernel_size,
+                stride=1,
+                padding=padding,
+                padding_mode="reflect",
+            ),
+            nn.GroupNorm(num_groups, out_channels),
+            nn.ReLU(),
+        )
+
+    def decode(self, latent_variables: torch.Tensor) -> torch.Tensor:
+        """
+        Decode latent variables into a reconstructed image.
+
+        Parameters
+        ----------
+        latent_variables: torch.Tensor (batch x latent_dim)
+        Returns
+        -------
+        torch.Tensor (batch x 3 x H x W)
+        """
+        output = self.decoder_input(latent_variables)
+        output = output.view(-1, *self.encoder_output_shape)
+        return self.decoder(output)
+
+    def reconstruction_loss(
+        self, img: torch.Tensor, img_hat: torch.Tensor, recon_loss_type: str = "l2"
+    ) -> torch.Tensor:
+        """
+        Compute reconstruction loss between target and predicted image.
+
+        Parameters
+        ----------
+        img : torch.Tensor (batch x channel x height x width)
+        img_hat : torch.Tensor (batch x channel x height x width)
+        recon_loss_type: str  "l1" or "l2"
+        Returns
+        -------
+        torch.Tensor
+        """
+        if recon_loss_type == "l1":
+            return F.l1_loss(img, img_hat, reduction="mean")
+        elif recon_loss_type == "l2":
+            return F.mse_loss(img, img_hat, reduction="mean")
+        else:
+            raise ValueError(f"Unknown recon_loss_type: {recon_loss_type}")
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass: LLM embedding → reconstructed image.
+
+        Parameters
+        ----------
+        inputs: torch.Tensor (batch x latent_dim)
+        Returns
+        -------
+        torch.Tensor (batch x 3 x H x W)
+        """
+        return self.decode(inputs)
+
+    def compute_loss(self, **kwargs) -> dict:
+        """
+        Compute reconstruction loss for standalone decoder training (LLM → image).
+
+        Parameters
+        ----------
+        **kwargs:
+            img: torch.Tensor (batch x channel x height x width)
+                Target image
+            text_embedding: torch.Tensor (batch x latent_dim)
+                LLM embedding used as input
+            loss_type: str  (default "l2")
+        Returns
+        -------
+        dict
+        """
+        img = kwargs.get("img")
+        text_embedding = kwargs.get("text_embedding")
+        loss_type = kwargs.get("loss_type", "l2")
+        img_hat = self.forward(text_embedding)
+        return {
+            "loss": self.reconstruction_loss(img, img_hat, recon_loss_type=loss_type)
+        }
+
+
+class AE(Encoder, Decoder):
+    """
+    Autoencoder: combines Encoder and Decoder.
     Input flow: image → encode → decode → reconstructed image.
     """
 
@@ -402,54 +425,15 @@ class AE(Decoder):
         encoder_checkpoint: bool = False,
     ) -> None:
         """Initialize the Autoencoder (AE) model."""
-        # Build decoder first (sets decoder_input, decoder, output_features, encoder_output_shape)
-        super().__init__(
-            latent_dim=latent_dim,
-            image_size=image_size,
-            checkpoint_path=None,
-            logger=logger,
-            set_weights=False,
-        )
+        # Initialize BaseModel (nn.Module) exactly once, bypassing Encoder/Decoder __init__
+        BaseModel.__init__(self, logger=logger)
 
-        # Build encoder (same architecture as the standalone Encoder class)
-        self.hidden_dims = [32, 64, 128, 256, 512]
-        s = image_size
-        self.encoder = nn.Sequential(
-            self.make_encoder_block(
-                in_channels, 32, kernel_size=7, padding=3, spatial_size=s
-            ),
-            self.make_encoder_block(32, 32, kernel_size=7, padding=3, spatial_size=s),
-            self.make_encoder_block(32, 64, kernel_size=5, padding=2, spatial_size=s),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            self.make_encoder_block(
-                64, 64, kernel_size=5, padding=2, spatial_size=(s := s // 2)
-            ),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            self.make_encoder_block(
-                64, 128, kernel_size=3, padding=1, spatial_size=(s := s // 2)
-            ),
-            self.make_encoder_block(128, 128, kernel_size=3, padding=1, spatial_size=s),
-            self.make_encoder_block(128, 256, kernel_size=3, padding=1, spatial_size=s),
-            self.make_encoder_block(256, 256, kernel_size=3, padding=1, spatial_size=s),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            self.make_encoder_block(
-                256, 512, kernel_size=1, padding=0, spatial_size=(s := s // 2)
-            ),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            self.make_encoder_block(
-                512, 512, kernel_size=1, padding=0, spatial_size=s // 2
-            ),
-            nn.AdaptiveAvgPool2d(2),
-        )
+        # Build encoder (sets self.encoder, self.fc_mu, self.encoder_output_shape, etc.)
+        self._build_encoder(in_channels, latent_dim, image_size)
 
-        # Verify encoder output matches the decoder's expected bottleneck shape
-        with torch.no_grad():
-            dummy = torch.zeros(1, in_channels, image_size, image_size)
-            out = self.encoder(dummy)
-            self.encoder_output_shape = out.shape[1:]
-            self.output_features = out.flatten(1).shape[1]
-
-        self.fc_mu = nn.Linear(self.output_features, latent_dim)
+        # Build decoder (sets self.decoder_input, self.decoder)
+        # encoder_output_shape and output_features are already set above with the same values
+        self._build_decoder(latent_dim, image_size)
 
         # set weights
         if set_weights:
@@ -461,99 +445,6 @@ class AE(Decoder):
             self._set_weights(checkpoint_path=checkpoint_path, strict=strict)
             # Freeze encoder weights
             self._freeze_encoder(freeze=True)
-
-    @staticmethod
-    def make_encoder_block(
-        in_channels: int,
-        out_channels: int,
-        kernel_size: int,
-        padding: int,
-        spatial_size: int,
-    ) -> nn.Module:
-        return nn.Sequential(
-            nn.Conv2d(
-                in_channels,
-                out_channels,
-                kernel_size=kernel_size,
-                stride=1,
-                padding=padding,
-            ),
-            nn.ReLU(),
-            nn.LayerNorm([out_channels, spatial_size, spatial_size]),
-        )
-
-    def encode(self, img: torch.Tensor) -> torch.Tensor:
-        """
-        Encode an image to a latent vector.
-
-        Parameters
-        ----------
-        img: torch.Tensor (batch x C x H x W)
-        Returns
-        -------
-        torch.Tensor (batch x latent_dim)
-        """
-        intermediate = self.encoder(img)
-        intermediate = torch.flatten(intermediate, start_dim=1)
-        return self.fc_mu(intermediate)
-
-    def latent_alignment_loss(
-        self,
-        latent_variables: torch.Tensor,
-        text_emb: torch.Tensor,
-        llm_alignment_loss_type: str = "norm_and_cosine_similarity",
-    ) -> Union[Tuple[torch.Tensor, torch.Tensor], torch.Tensor]:
-        """
-        Compute alignment loss between latent variables and text embeddings.
-        (Identical to Encoder.latent_alignment_loss — needed by BetaVAE.)
-        """
-        if llm_alignment_loss_type == "norm_and_cosine_similarity":
-            # pylint: disable=not-callable
-            cosine_sim_loss = (
-                1 - F.cosine_similarity(latent_variables, text_emb, dim=1).mean()
-            )
-            norms = latent_variables.norm(p=2, dim=1)
-            norm_loss = F.mse_loss(norms, torch.ones_like(norms), reduction="mean")
-            return cosine_sim_loss, norm_loss
-        elif llm_alignment_loss_type == "norm_and_cosine_similarity_smoothL1":
-            # pylint: disable=not-callable
-            cosine_sim_loss = (
-                1 - F.cosine_similarity(latent_variables, text_emb, dim=1).mean()
-            )
-            norms = latent_variables.norm(p=2, dim=1)
-            norm_loss = F.smooth_l1_loss(
-                norms, torch.ones_like(norms), reduction="mean", beta=1.0
-            )
-            return cosine_sim_loss, norm_loss
-        elif llm_alignment_loss_type == "cosine_similarity":
-            # pylint: disable=not-callable
-            return 1 - F.cosine_similarity(latent_variables, text_emb, dim=1).mean()
-        elif llm_alignment_loss_type == "l1":
-            return F.l1_loss(latent_variables, text_emb, reduction="mean")
-        elif llm_alignment_loss_type == "l2":
-            return F.mse_loss(latent_variables, text_emb, reduction="mean")
-        else:
-            raise ValueError(
-                f"Unknown loss_type for llm alignment: {llm_alignment_loss_type}"
-            )
-
-    def _freeze_encoder(self, freeze: bool = True) -> None:
-        """Freeze or unfreeze the encoder weights."""
-        for param in self.encoder.parameters():
-            param.requires_grad = not freeze
-        for param in self.fc_mu.parameters():
-            param.requires_grad = not freeze
-        self._encoder_frozen = freeze
-        if freeze:
-            self.encoder.eval()
-            self.fc_mu.eval()
-
-    def train(self, mode: bool = True):
-        super().train(mode)
-        if mode and getattr(self, "_encoder_frozen", False):
-            self.encoder.eval()
-            self.fc_mu.eval()
-        return self
 
     def forward(self, inputs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -613,7 +504,7 @@ class BetaVAE(AE):
             image_size=image_size,
             checkpoint_path=None,
             logger=logger,
-            set_weights=False,  # We will set weights (or initialize them) after adding the decoder
+            set_weights=False,  # We will set weights (or initialize them) after adding fc_logvar
         )
 
         # Add a fully connected layer for log variance
@@ -901,7 +792,7 @@ class BetaVAEScalingLLM(BetaVAE):
             image_size=image_size,
             checkpoint_path=None,
             logger=logger,
-            set_weights=False,  # We will set weights (or initialize them) after adding the decoder
+            set_weights=False,  # We will set weights (or initialize them) after adding llm_scaler
         )
 
         # Add a fully connected layer for log variance
