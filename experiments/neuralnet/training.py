@@ -417,7 +417,7 @@ class DataParallelismTrainer:
                 )
 
         # VAE (llm -> image)
-        elif model_type == "beta_vae_llm":
+        elif model_type in ["beta_vae_llm", "decoder"]:
             loss_kwargs.update(
                 {
                     "text_embedding": batch["text_embedding"].to(

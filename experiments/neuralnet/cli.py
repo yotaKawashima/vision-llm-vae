@@ -78,7 +78,9 @@ class CommandLineInterface:
             )
         elif self.model_type == "ae":
             if self.encoder_checkpoint and config.checkpoint_path is None:
-                raise ValueError("encoder_checkpoint=True requires checkpoint_path to be set.")
+                raise ValueError(
+                    "encoder_checkpoint=True requires checkpoint_path to be set."
+                )
             self.model = model_lib.AE(
                 latent_dim=config.latent_dim,
                 image_size=config.img_resize,
@@ -89,7 +91,9 @@ class CommandLineInterface:
             )
         elif self.model_type == "beta_vae":
             if self.ae_checkpoint and config.checkpoint_path is None:
-                raise ValueError("ae_checkpoint=True requires checkpoint_path to be set.")
+                raise ValueError(
+                    "ae_checkpoint=True requires checkpoint_path to be set."
+                )
             self.model = model_lib.BetaVAE(
                 latent_dim=config.latent_dim,
                 image_size=config.img_resize,
@@ -105,6 +109,14 @@ class CommandLineInterface:
                 checkpoint_path=config.checkpoint_path,
                 logger=self.logger,
                 vae_checkpoint=self.vae_checkpoint,
+            )
+        elif self.model_type == "decoder":
+            self.model = model_lib.Decoder(
+                latent_dim=config.latent_dim,
+                image_size=config.img_resize,
+                checkpoint_path=config.checkpoint_path,
+                logger=self.logger,
+                set_weights=config.checkpoint_path is not None,
             )
         else:
             self.logger.log_error(f"Unknown model type '{self.model_type}' specified.")
