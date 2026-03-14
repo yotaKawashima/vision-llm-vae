@@ -264,6 +264,8 @@ class Decoder(BaseModel):
 
     def _build_decoder(self, latent_dim: int, image_size: int) -> None:
         """Build decoder layers. Called by __init__ and AE.__init__."""
+        self.latent_dim = latent_dim
+        self.image_size = image_size
         self.encoder_output_shape: Tuple[int, int, int] = (
             self._ENC_OUT_CHANNELS,
             self._ENC_OUT_SPATIAL,

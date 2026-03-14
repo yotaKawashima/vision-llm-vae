@@ -37,7 +37,10 @@ class Encoder(BaseModel):
             self._set_weights(checkpoint_path=checkpoint_path)
 
     def _build_encoder(
-        self, in_channels: int, latent_dim: int, image_size: int
+        self,
+        in_channels: int,  # backwards compatibility, not actually used since ResNet18 always takes 3-channel input
+        latent_dim: int,
+        image_size: int,
     ) -> None:
         """Build encoder layers. Called by __init__ and AE.__init__."""
         self.latent_dim = latent_dim
@@ -313,6 +316,8 @@ class Decoder(BaseModel):
 
     def _build_decoder(self, latent_dim: int, image_size: int) -> None:
         """Build decoder layers. Called by __init__ and AE.__init__."""
+        self.latent_dim = latent_dim
+        self.image_size = image_size
         # Spatial size after ResNet18 layer4: image_size // 32
         stem_size = image_size // 32
         self.encoder_output_shape: Tuple[int, int, int] = (512, stem_size, stem_size)
