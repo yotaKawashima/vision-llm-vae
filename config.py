@@ -27,7 +27,7 @@ learning_rate = 0.0005
 clip_grad_norm = 1.0
 ###### Model ######
 model_type = "decoder"  # "encoder", "ae", "beta_vae", "beta_vae_llm", "decoder"
-resnet_flag = False
+resnet_flag = True
 latent_dim = text_embedding_dim
 checkpoint_path = None
 # checkpoint_path = Path(
@@ -54,7 +54,7 @@ MODEL_CONFIGS = {
         "loss_type": "l2",
     },
     "beta_vae": {
-        "loss_type": "llm_alignment",  # or "standard"
+        "loss_type": "standard",  # or "llm_alignment"
         "beta": 0.001,  # beta for KL divergence loss
         "recon_loss_type": "l2",
         "llm_alignment_loss_type": "cosine_similarity",
@@ -95,10 +95,10 @@ elif model_type == "beta_vae":
             + f"_gamma{current_cfg['gamma']}"
         )
     else:
-        assert (
-            not ae_checkpoint
-        ), "ae_checkpoint can only be True when loss_type is 'llm_alignment' for beta_vae model."
-        full_model_name = "vanilla_" + full_model_name
+        if ae_checkpoint:
+            full_model_name = "vanilla_from_ae_" + full_model_name
+        else:
+            full_model_name = "vanilla_" + full_model_name
 
 elif model_type == "ae":
     if not encoder_checkpoint:
