@@ -27,11 +27,11 @@ learning_rate = 0.0005
 clip_grad_norm = 1.0
 ###### Model ######
 model_type = "ae"  # "encoder", "ae", "beta_vae", "beta_vae_llm", "decoder"
-resnet_flag = False
+resnet_flag = True
 latent_dim = text_embedding_dim
 # checkpoint_path = None
 checkpoint_path = Path(
-    "/mnt/data/checkpoints/encoder_loss_norm_and_cosine_similarity_smoothL1_alpha10.0/cocoDoerig/run_0/checkpoint_epoch30.ckpt"
+    "/mnt/data/checkpoints/resnet18_encoder_loss_norm_and_cosine_similarity_smoothL1_alpha10.0/cocoDoerig/run_0/checkpoint_epoch30.ckpt"
 )  # or None
 encoder_checkpoint = True  # whether to initialize the encoder with the checkpoint from the encoder model (only applicable for ae model)
 ae_checkpoint = False  # whether to initialize the ae model with the checkpoint from the ae model (only applicable for beta_vae model)
