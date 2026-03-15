@@ -27,7 +27,7 @@ learning_rate = 0.0005
 clip_grad_norm = 1.0
 ###### Model ######
 model_type = "ae"  # "encoder", "ae", "beta_vae", "beta_vae_llm", "decoder"
-resnet_flag = False
+resnet_flag = True
 latent_dim = text_embedding_dim
 checkpoint_path = None
 # checkpoint_path = Path(
