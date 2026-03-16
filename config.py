@@ -58,7 +58,7 @@ MODEL_CONFIGS = {
         "beta": 0.001,  # beta for KL divergence loss
         "recon_loss_type": "l2",
         "llm_alignment_loss_type": "cosine_similarity",
-        "gamma": 0.25,  # weight for llm alignment loss when loss_type is "llm_alignment"
+        "gamma": 0.1,  # weight for llm alignment loss when loss_type is "llm_alignment"
     },
     "beta_vae_llm": {
         "loss_type": "l2",
