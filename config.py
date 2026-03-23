@@ -31,7 +31,7 @@ resnet_flag = False
 latent_dim = text_embedding_dim
 # checkpoint_path = None
 checkpoint_path = Path(
-    "/mnt/data/checkpoints/ae_loss_l2/cocoDoerig/run_0/checkpoint_epoch25.ckpt"
+    "/mnt/data/checkpoints/vanilla_ae_loss_l2/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
 )  # or None
 encoder_checkpoint = False  # whether to initialize the encoder with the checkpoint from the encoder model (only applicable for ae model)
 ae_checkpoint = True  # whether to initialize the ae model with the checkpoint from the ae model (only applicable for beta_vae model)
@@ -43,22 +43,25 @@ gamma = None
 recon_loss_type = None
 llm_alignment_loss_type = None
 alpha = None
+temperature = None
 
 
 MODEL_CONFIGS = {
     "encoder": {
         "loss_type": "norm_and_cosine_similarity_smoothL1",  # default loss
         "alpha": 10.0,  # weight for cosine similarity loss when loss_type is "norm_and_cosine_similarity_smoothL1" or "norm_and_cosine_similarity"
+        "temperature": None,  # temperature for soft_nn alignment loss
     },
     "ae": {
         "loss_type": "l2",
     },
     "beta_vae": {
-        "loss_type": "llm_alignment",  # or "llm_alignment"
-        "beta": 0.002,  # beta for KL divergence loss
+        "loss_type": "standard",  # or "llm_alignment"
+        "beta": 0.001,  # beta for KL divergence loss
         "recon_loss_type": "l2",
         "llm_alignment_loss_type": "cosine_similarity",
         "gamma": 0.5,  # weight for llm alignment loss when loss_type is "llm_alignment"
+        "temperature": None,  # temperature for soft_nn alignment loss
     },
     "beta_vae_llm": {
         "loss_type": "l2",
@@ -71,6 +74,33 @@ MODEL_CONFIGS = {
 # model to use
 current_cfg = MODEL_CONFIGS[model_type]
 
+if model_type == "encoder" and current_cfg.get("loss_type") in [
+    "soft_nn",
+    "norm_and_soft_nn",
+]:
+    if current_cfg.get("temperature") is None:
+        raise ValueError(
+            f"Temperature must be specified for encoder soft_nn-based loss. Current config: {current_cfg}"
+        )
+
+if (
+    model_type == "beta_vae"
+    and current_cfg.get("loss_type") == "llm_alignment"
+    and current_cfg.get("llm_alignment_loss_type") == "soft_nn"
+):
+    if current_cfg.get("temperature") is None:
+        raise ValueError(
+            f"Temperature must be specified for beta_vae soft_nn alignment loss. Current config: {current_cfg}"
+        )
+
+if model_type == "beta_vae" and current_cfg.get("loss_type") == "llm_alignment":
+    if current_cfg.get("llm_alignment_loss_type") not in [
+        "cosine_similarity",
+        "soft_nn",
+    ]:
+        raise ValueError(
+            "Supported llm alignment loss types for BetaVAE: cosine_similarity, soft_nn."
+        )
 # unpack the current config to global variables
 for key, value in current_cfg.items():
     globals()[key] = value
@@ -83,6 +113,12 @@ else:
 if model_type == "encoder":
     full_model_name = full_model_name + f"_alpha{current_cfg['alpha']}"
 
+    if (
+        current_cfg.get("loss_type") in ["soft_nn", "norm_and_soft_nn"]
+        and current_cfg.get("temperature") is not None
+    ):
+        full_model_name = full_model_name + f"_temp{current_cfg['temperature']}"
+
 elif model_type == "beta_vae":
     full_model_name = full_model_name + f"_beta{current_cfg['beta']}"
 
@@ -94,6 +130,11 @@ elif model_type == "beta_vae":
             + f"_llm_alignment_loss_{current_cfg['llm_alignment_loss_type']}"
             + f"_gamma{current_cfg['gamma']}"
         )
+        if (
+            current_cfg.get("llm_alignment_loss_type") == "soft_nn"
+            and current_cfg.get("temperature") is not None
+        ):
+            full_model_name = full_model_name + f"_temp{current_cfg['temperature']}"
     else:
         if ae_checkpoint:
             full_model_name = "vanilla_from_ae_" + full_model_name
