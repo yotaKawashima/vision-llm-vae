@@ -145,11 +145,34 @@ class Encoder(BaseModel):
         intermediate = torch.flatten(intermediate, start_dim=1)
         return self.fc_mu(intermediate)
 
+    @staticmethod
+    def soft_nn_loss(
+        mu: torch.Tensor,
+        text_emb: torch.Tensor,
+        temperature: float,
+    ) -> torch.Tensor:
+        """
+        Soft nearest-neighbour (InfoNCE-style) contrastive loss.
+
+        Parameters
+        ----------
+        mu: torch.Tensor (batch x latent_dim)
+        text_emb: torch.Tensor (batch x text_embedding_dim)
+        temperature: float
+        Returns
+        -------
+        torch.Tensor
+        """
+        sim = mu @ text_emb.T / temperature  # [batch, batch]
+        labels = torch.arange(sim.size(0), device=sim.device)
+        return F.cross_entropy(sim, labels)
+
     def latent_alignment_loss(
         self,
         latent_variables: torch.Tensor,
         text_emb: torch.Tensor,
         llm_alignment_loss_type: str = "norm_and_cosine_similarity",
+        temperature: float | None = 0.1,
     ) -> Union[Tuple[torch.Tensor, torch.Tensor], torch.Tensor]:
         """
         Compute alignment loss between latent variables and text embeddings.
@@ -159,6 +182,8 @@ class Encoder(BaseModel):
         latent_variables: torch.Tensor (batch x latent_dim)
         text_emb: torch.Tensor (batch x text_embedding_dim)
         llm_alignment_loss_type: str
+        temperature: float or None
+            Temperature for soft_nn loss. Required when llm_alignment_loss_type is "soft_nn" or "norm_and_soft_nn".
         Returns
         -------
         Union[Tuple[torch.Tensor, torch.Tensor], torch.Tensor]
@@ -184,6 +209,17 @@ class Encoder(BaseModel):
         elif llm_alignment_loss_type == "cosine_similarity":
             # pylint: disable=not-callable
             return 1 - F.cosine_similarity(latent_variables, text_emb, dim=1).mean()
+        elif llm_alignment_loss_type == "soft_nn":
+            return self.soft_nn_loss(
+                latent_variables, text_emb, temperature=temperature
+            )
+        elif llm_alignment_loss_type == "norm_and_soft_nn":
+            soft_nn_loss = self.soft_nn_loss(
+                latent_variables, text_emb, temperature=temperature
+            )
+            norms = latent_variables.norm(p=2, dim=1)
+            norm_loss = F.mse_loss(norms, torch.ones_like(norms), reduction="mean")
+            return soft_nn_loss, norm_loss
         elif llm_alignment_loss_type == "l1":
             return F.l1_loss(latent_variables, text_emb, reduction="mean")
         elif llm_alignment_loss_type == "l2":
@@ -204,6 +240,7 @@ class Encoder(BaseModel):
             text_embedding: torch.Tensor (batch x text_embedding_dim)
             loss_type: str  (default "norm_and_cosine_similarity")
             alpha: float    (default 1.0)
+            temperature: float  (required for "soft_nn" and "norm_and_soft_nn")
         Returns
         -------
         dict
@@ -212,9 +249,17 @@ class Encoder(BaseModel):
         text_embedding = kwargs.get("text_embedding")
         loss_type = kwargs.get("loss_type", "norm_and_cosine_similarity")
         alpha = kwargs.get("alpha", 1.0)
+        temperature = kwargs.get("temperature", None)
+        if loss_type in ["soft_nn", "norm_and_soft_nn"] and temperature is None:
+            raise ValueError(
+                "temperature must be provided for soft_nn llm_alignment_loss_type."
+            )
         latent_variable = self.forward(img)
         output = self.latent_alignment_loss(
-            latent_variable, text_embedding, llm_alignment_loss_type=loss_type
+            latent_variable,
+            text_embedding,
+            llm_alignment_loss_type=loss_type,
+            temperature=temperature,
         )
 
         if loss_type in [
@@ -226,6 +271,14 @@ class Encoder(BaseModel):
             return {
                 "loss": total_loss,
                 "cosine_sim_loss": cosine_sim_loss,
+                "norm_loss": norm_loss,
+            }
+        elif loss_type == "norm_and_soft_nn":
+            soft_nn_loss, norm_loss = output
+            total_loss = alpha * soft_nn_loss + norm_loss
+            return {
+                "loss": total_loss,
+                "soft_nn_loss": soft_nn_loss,
                 "norm_loss": norm_loss,
             }
         else:
@@ -645,6 +698,7 @@ class BetaVAE(AE):
         gamma: float,
         text_embedding: torch.Tensor,
         llm_alignment_loss_type: str = "cosine_similarity",
+        temperature: float | None = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Compute the loss for the VAE after pretraining.
@@ -664,6 +718,8 @@ class BetaVAE(AE):
             Text embedding tensor to condition the network
         llm_alignment_loss_type: str
             Type of LLM alignment loss to compute.
+        temperature: float or None
+            Temperature for soft_nn alignment loss. Required when llm_alignment_loss_type is "soft_nn".
         Returns
         -------
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
@@ -686,13 +742,18 @@ class BetaVAE(AE):
         )
 
         # llm allignment loss (direction)
-        assert llm_alignment_loss_type in [
-            "cosine_similarity"
-        ], "Currently only cosine similarity loss is supported for llm alignment loss."
+        if llm_alignment_loss_type not in [
+            "cosine_similarity",
+            "soft_nn",
+        ]:
+            raise ValueError(
+                "Supported llm alignment loss types for BetaVAE: cosine_similarity, soft_nn."
+            )
         llm_alignment_loss = self.latent_alignment_loss(
             mu,
             text_embedding,
             llm_alignment_loss_type=llm_alignment_loss_type,
+            temperature=temperature,
         )
 
         total_loss = recon_loss + beta * kl_loss + gamma * llm_alignment_loss
@@ -720,6 +781,8 @@ class BetaVAE(AE):
                 Weight for the LLM alignment term (required for "llm_alignment").
             text_embedding : torch.Tensor
                 Text embedding tensor (required for "llm_alignment").
+            temperature : float
+                Temperature for soft_nn alignment loss (required when llm_alignment_loss_type is "soft_nn").
         Returns
         -------
         dict
@@ -732,6 +795,7 @@ class BetaVAE(AE):
         llm_alignment_loss_type = kwargs.get("llm_alignment_loss_type", None)
         gamma = kwargs.get("gamma", None)
         text_embedding = kwargs.get("text_embedding", None)
+        temperature = kwargs.get("temperature", None)
 
         if loss_type == "standard":
             total_loss, recon_loss, kl_loss = self.compute_vae_loss(
@@ -753,6 +817,10 @@ class BetaVAE(AE):
                 raise ValueError(
                     "gamma, text_embedding and llm_alignment_loss_type must be provided for llm_alignment loss."
                 )
+            if llm_alignment_loss_type == "soft_nn" and temperature is None:
+                raise ValueError(
+                    "temperature must be provided for soft_nn llm_alignment_loss_type."
+                )
             total_loss, recon_loss, kl_loss, llm_alignment_loss = (
                 self.compute_vae_loss_with_alignment(
                     img,
@@ -761,6 +829,7 @@ class BetaVAE(AE):
                     gamma,
                     text_embedding,
                     llm_alignment_loss_type=llm_alignment_loss_type,
+                    temperature=temperature,
                 )
             )
             return {
@@ -867,8 +936,6 @@ class BetaVAEScalingLLM(BetaVAE):
         for param in self.decoder_input.parameters():
             param.requires_grad = not freeze
         for param in self.decoder.parameters():
-            param.requires_grad = not freeze
-        for param in self.final_layer.parameters():
             param.requires_grad = not freeze
         if freeze:
             self.decoder_input.eval()

@@ -88,7 +88,8 @@ class DataParallelismTrainer:
         target_beta: float = 1.0,
         target_gamma: float = 1.0,
         clip_grad_norm: float = 1.0,
-        initial_history: Dict[str, Any] = None,
+        temperature: float | None = None,
+        initial_history: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         """
         Trains the model dynamically handling Encoder, AE, and VAE outputs.
@@ -117,6 +118,8 @@ class DataParallelismTrainer:
             The target gamma value for alignment loss (only used if loss_type is "llm_alignment")
         clip_grad_norm: float or None
             The maximum norm for gradient clipping. If None, no clipping is applied.
+        temperature: float or None
+            Temperature for soft_nn alignment loss. Required when llm_alignment_loss_type is "soft_nn".
         initial_history: dict or None
             An optional dictionary containing initial training history to continue from. If None, a new history will be created.
         Returns
@@ -215,6 +218,7 @@ class DataParallelismTrainer:
                     recon_loss_type,
                     gamma,
                     llm_alignment_loss_type,
+                    temperature,
                 )
 
                 self.optimizer.zero_grad()
@@ -321,6 +325,7 @@ class DataParallelismTrainer:
                         recon_loss_type,
                         gamma,
                         llm_alignment_loss_type,
+                        temperature,
                     )
 
                     # --- Forward Pass ---
@@ -382,6 +387,7 @@ class DataParallelismTrainer:
         recon_loss_type,
         gamma,
         llm_alignment_loss_type,
+        temperature,
     ):
 
         # Tensor types (img, text_embedding) are automatically split and moved to GPUs by DataParallel.
@@ -398,6 +404,7 @@ class DataParallelismTrainer:
                         self.master_device, non_blocking=True
                     ),
                     "alpha": alpha,
+                    "temperature": temperature,
                 }
             )
 
@@ -413,6 +420,7 @@ class DataParallelismTrainer:
                         ),
                         "gamma": gamma,
                         "llm_alignment_loss_type": llm_alignment_loss_type,
+                        "temperature": temperature,
                     }
                 )
 
