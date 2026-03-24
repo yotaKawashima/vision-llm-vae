@@ -1005,8 +1005,9 @@ class BetaVAEScalingLLM(BetaVAE):
             img_intermediate_flat = torch.flatten(img_intermedaite, start_dim=1)
             mu = self.fc_mu(img_intermediate_flat)
             mu_norm = mu.norm(p=2, dim=1)
-            scaled_text_norm = (scaled_inputs).norm(p=2, dim=1)
-            norm_loss = F.mse_loss(mu_norm, scaling_factor, reduction="mean")
+            norm_loss = F.mse_loss(
+                mu_norm, torch.abs(scaling_factor).squeeze(-1), reduction="mean"
+            )
             loss = recon_loss + norm_loss
             return {"loss": loss, "recon_loss": recon_loss, "norm_loss": norm_loss}
         else:
