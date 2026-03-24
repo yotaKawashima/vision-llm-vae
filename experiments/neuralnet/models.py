@@ -988,5 +988,17 @@ class BetaVAEScalingLLM(BetaVAE):
         img = kwargs.get("img")
         text_embedding = kwargs.get("text_embedding")
         loss_type = kwargs.get("loss_type", "l2")
-        img_hat, _ = self.forward(text_embedding)
-        return {"loss": self.reconstruction_loss(img, img_hat, loss_type)}
+
+        if loss_type == "img_norm":
+            # maybe better to use scaling factor as text_embedding should be norm = 1.
+            scaled_inputs, _ = self.scale(text_embedding)
+            img_intermedaite = self.encoder(img)
+            img_intermediate_flat = torch.flatten(img_intermedaite, start_dim=1)
+            mu = self.fc_mu(img_intermediate_flat)
+            mu_norm = mu.norm(p=2, dim=1)  # [batch]
+            scaled_text_norm = (scaled_inputs).norm(p=2, dim=1)  # [batch]
+            loss = F.mse_loss(mu_norm, scaled_text_norm, reduction="mean")
+        else:
+            img_hat, _ = self.forward(text_embedding)
+            loss = self.reconstruction_loss(img, img_hat, loss_type)
+        return {"loss": loss}

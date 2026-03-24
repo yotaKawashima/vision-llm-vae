@@ -68,7 +68,7 @@ MODEL_CONFIGS = {
         "temperature": None,  # temperature for soft_nn alignment loss
     },
     "beta_vae_llm": {
-        "loss_type": "l2",
+        "loss_type": "img_norm",  # "l2" or "img_norm" (a custom loss that matches the norm of the latent representation with the norm of the text embeddings after scaling)
     },
     "decoder": {
         "loss_type": "l2",
