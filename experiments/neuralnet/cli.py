@@ -49,6 +49,7 @@ class CommandLineInterface:
         self.alpha = None
         self.beta = None
         self.gamma = None
+        self.delta = None
         self.clip_grad_norm = None
         self.model = None
         self.target_layers = None
@@ -223,7 +224,8 @@ class CommandLineInterface:
             self.alpha,
             self.beta,
             self.gamma,
-            self.clip_grad_norm,
+            self.delta,
+            clip_grad_norm=self.clip_grad_norm,
             initial_history=initial_history,
         )
 
@@ -452,6 +454,14 @@ class CommandLineInterface:
             type=float,
             default=config.gamma,
             help="The weight for llm direction alignment loss. Defaults to config.gamma.",
+        )
+        train_command_parser.add_argument(
+            "-D",
+            "--delta",
+            dest="delta",
+            type=float,
+            default=config.delta,
+            help="The weight for the norm loss when loss_type is l2_and_img_norm. Defaults to config.delta.",
         )
         train_command_parser.add_argument(
             "--writer-path",

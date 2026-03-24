@@ -980,6 +980,8 @@ class BetaVAEScalingLLM(BetaVAE):
                 Text embedding tensor
             loss_type : str
                 Type of loss to compute. (default is l2)
+            delta : float
+                Weight for the norm loss when loss_type is "l2_and_img_norm"
         Returns
         -------
         dict
@@ -988,6 +990,7 @@ class BetaVAEScalingLLM(BetaVAE):
         img = kwargs.get("img")
         text_embedding = kwargs.get("text_embedding")
         loss_type = kwargs.get("loss_type", "l2")
+        delta = kwargs.get("delta", 1.0)
 
         if loss_type == "img_norm":
             # maybe better to use scaling factor as text_embedding should be norm = 1.
@@ -1008,7 +1011,7 @@ class BetaVAEScalingLLM(BetaVAE):
             norm_loss = F.mse_loss(
                 mu_norm, torch.abs(scaling_factor).squeeze(-1), reduction="mean"
             )
-            loss = recon_loss + norm_loss
+            loss = recon_loss + delta * norm_loss
             return {"loss": loss, "recon_loss": recon_loss, "norm_loss": norm_loss}
         else:
             img_hat, _ = self.forward(text_embedding)

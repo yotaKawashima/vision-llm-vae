@@ -44,6 +44,7 @@ last_checkpoint_path = None  # for activation extraction
 loss_type = None
 beta = None
 gamma = None
+delta = None
 recon_loss_type = None
 llm_alignment_loss_type = None
 alpha = None
@@ -69,6 +70,7 @@ MODEL_CONFIGS = {
     },
     "beta_vae_llm": {
         "loss_type": "l2_and_img_norm",  # "l2" or "img_norm" (a custom loss that matches the norm of the latent representation with the norm of the text embeddings after scaling)
+        "delta": 0.1,  # weight for the norm loss when loss_type is "l2_and_img_norm"
     },
     "decoder": {
         "loss_type": "l2",
@@ -150,7 +152,10 @@ elif model_type == "ae":
     if not encoder_checkpoint:
         full_model_name = "vanilla_" + full_model_name
 
-elif model_type in ["beta_vae_llm", "decoder"]:
+elif model_type == "beta_vae_llm":
+    full_model_name = full_model_name + f"_delta{current_cfg['delta']}"
+
+elif model_type in ["decoder"]:
     pass
 else:
     raise ValueError(

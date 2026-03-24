@@ -87,6 +87,7 @@ class DataParallelismTrainer:
         target_alpha: float = 1.0,
         target_beta: float = 1.0,
         target_gamma: float = 1.0,
+        target_delta: float = 1.0,
         clip_grad_norm: float = 1.0,
         temperature: float | None = None,
         initial_history: Dict[str, Any] | None = None,
@@ -204,6 +205,11 @@ class DataParallelismTrainer:
             else:
                 alpha = None
 
+            if model_type == "beta_vae_llm":
+                delta = target_delta
+            else:
+                delta = None
+
             epoch_metrics = {}
             num_processed_samples = 0
 
@@ -219,6 +225,7 @@ class DataParallelismTrainer:
                     gamma,
                     llm_alignment_loss_type,
                     temperature,
+                    delta,
                 )
 
                 self.optimizer.zero_grad()
@@ -326,6 +333,7 @@ class DataParallelismTrainer:
                         gamma,
                         llm_alignment_loss_type,
                         temperature,
+                        delta,
                     )
 
                     # --- Forward Pass ---
@@ -388,6 +396,7 @@ class DataParallelismTrainer:
         gamma,
         llm_alignment_loss_type,
         temperature,
+        delta=None,
     ):
 
         # Tensor types (img, text_embedding) are automatically split and moved to GPUs by DataParallel.
@@ -433,6 +442,8 @@ class DataParallelismTrainer:
                     )
                 }
             )
+            if model_type == "beta_vae_llm" and delta is not None:
+                loss_kwargs.update({"delta": delta})
 
         return loss_kwargs
 
