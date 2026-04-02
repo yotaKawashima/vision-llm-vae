@@ -235,7 +235,7 @@ else:  # no data augmentation for image reconstruction models
 
 ############################################################################
 ###### Variable related to data path ######
-data_dir_path = Path("/workspace/data/")
+data_dir_path = Path("/mnt/data/")
 coco_version = "Doerig"
 coco_caption_dir = data_dir_path / "coco"
 nsd_stimulus_path = data_dir_path / "nsd" / "nsd_stim" / "nsd_stimuli.hdf5"
