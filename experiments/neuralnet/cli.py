@@ -268,7 +268,6 @@ class CommandLineInterface:
             pin_memory=True,
             persistent_workers=True,
             drop_last=False,
-            prefetch_factor=2,
         )
 
         evaluator = Evaluator(self.model, dataloader, self.logger)
