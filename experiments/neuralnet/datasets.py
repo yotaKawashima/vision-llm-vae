@@ -337,9 +337,8 @@ class NSDStimulusDataset(Dataset):
         self._len = len(self.ids)
 
         # load image stimuli in NSD
-        # Note that we read all stimuli into RAM here.
-        with h5py.File(nsd_stimulus_path, "r") as h5_file:
-            images_np = h5_file["imgBrick"][:]
+        self.h5_file = h5py.File(nsd_stimulus_path, "r")
+        self.images_np = self.h5_file["imgBrick"]
 
         # load text embeddings
         text_embeddings = torch.load(nsd_text_embeddings_path, map_location="cpu")
@@ -349,10 +348,8 @@ class NSDStimulusDataset(Dataset):
 
         # extract the stimuli corresponding to this subject if per-subject
         if self._is_per_subject:
-            self.images_np = images_np[self.ids, :, :, :]
             self.text_embeddings = text_embeddings[self.ids, :]
         else:
-            self.images_np = images_np
             self.text_embeddings = text_embeddings
 
     def __len__(self):
@@ -360,7 +357,13 @@ class NSDStimulusDataset(Dataset):
 
     def __getitem__(self, idx):
         # Image: uint8 HWC
-        img_np = self.images_np[idx]
+        if self._is_per_subject:
+            # img_idx should be the nsdID
+            img_idx = self.ids[idx]
+        else:
+            # img_idx should be dataset internal index.
+            img_idx = idx
+        img_np = self.images_np[img_idx]
         if self.img_transform is not None:
             image = self.img_transform(img_np)
         else:
@@ -377,3 +380,6 @@ class NSDStimulusDataset(Dataset):
             "text_embedding": text_embedding,
             self.id_key: self.ids[idx],
         }
+
+    def __del__(self):
+        self.h5_file.close()
