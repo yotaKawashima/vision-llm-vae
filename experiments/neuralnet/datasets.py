@@ -245,16 +245,11 @@ class CocoH5Dataset(Dataset):
             logger.log_info(
                 f"Loading {split} dataset into RAM. This might take a minute..."
             )
-        with h5py.File(h5_path, "r") as f:
-            self.coco_ids = f[split]["coco_ids"][:].tolist()
-            self._len = len(self.coco_ids)  # number of samples in this split
-
-            # Note: we read the entire image and embedding datasets into memory as numpy arrays.
-            self.images_np = f[split]["data"][:]
-            embeddings_np = f[split][self.embedding_key][:]
-            # make sure that embeddings are L2 normalized (they should already be, but just in case)
-            norms = np.linalg.norm(embeddings_np, axis=1, keepdims=True)
-            self.embeddings_np = embeddings_np / (norms + 1e-12)
+        self.h5_file = h5py.File(h5_path, "r")
+        self.coco_ids = self.h5_file[split]["coco_ids"][:].tolist()
+        self._len = len(self.coco_ids)  # number of samples in this split
+        self.images_np = self.h5_file[split]["data"]
+        self.embeddings_np = self.h5_file[split][self.embedding_key]
 
         if logger is not None:
             logger.log_info("Done loading into RAM!")
@@ -270,8 +265,14 @@ class CocoH5Dataset(Dataset):
         else:
             image = img_np
 
+        if isinstance(image, np.ndarray):
+            image = torch.from_numpy(image)
+
         # Embedding
         emb_np = self.embeddings_np[idx]
+        # make sure that embeddings are L2 normalized (they should already be, but just in case)
+        norms = np.linalg.norm(emb_np)
+        emb_np = emb_np / (norms + 1e-12)
         text_embedding = torch.from_numpy(emb_np)
 
         return {
@@ -280,90 +281,102 @@ class CocoH5Dataset(Dataset):
             "image_id": self.coco_ids[idx],
         }
 
+    def __del__(self):
+        self.h5_file.close()
+
 
 class NSDStimulusDataset(Dataset):
     """
     NSDStimulusDataset
     -----------------------------
+    PyTorch Dataset that provides images and text embeddings from the NSD Stimulus dataset.
 
-    PyTorch Dataset that provides images from the NSD Stimulus dataset.
-
+    Parameters
+    ----------
+    subject : int, str, or None, optional
+        Subject identifier. If None (default), loads all stimuli.
+        If "special515", uses special515 dataset. Otherwise, should be an integer corresponding
+        to a subject.
+    nsd_stimulus_info_path : str, optional
+        Path to the NSD stimulus info pickle file. (nsd_stim_info_merged.pkl)
+        Used when subject is None.
+    nsd_stimulus_path : str, optional
+        Path to the NSD stimulus HDF5 file. (nsd_stimuli.hdf5)
+    nsd_text_embeddings_path : str, optional
+        Path to the precomputed text embeddings for NSD stimuli. (pt file)
+    img_transform : callable, optional
+        A function or torchvision.transforms pipeline to apply to the images. If None, no transform is applied.
     """
 
     def __init__(
         self,
-        subject: Union[int, str],
+        subject: Union[int, str, None] = None,
         nsd_stimulus_info_path=config.nsd_stimulus_info_path,
+        nsd_stimulus_path=config.nsd_stimulus_path,
+        nsd_text_embeddings_path=config.text_embeddings_nsd_path,
         img_transform=None,
     ):
-
-        # subject
-        if isinstance(subject, int):
-            if subject not in config.subjects:
-                raise ValueError("Invalid subject")
-            else:
-                self.subject = f"subject{subject}_train"
-        else:
-            if subject == "test":
-                self.subject = "test"
-            else:
-                raise ValueError("Invalid subject")
-
-        # image
-        self.coco_train_img_dir = config.coco_image_train_dir_path
-        self.coco_val_img_dir = config.coco_image_val_dir_path
+        self.subject = subject
+        self.img_transform = img_transform
+        self._is_per_subject = subject is not None
 
         # load stimulus info
-        self.stimulus_info = pd.read_pickle(nsd_stimulus_info_path)
-        self.stimulus_info_shared1000 = self.stimulus_info[
-            self.stimulus_info.shared1000
-        ]
-        self.stimulus_info_subject = self._get_stimulus_info_subject(subject)
-        self.img_transform = img_transform
+        if self._is_per_subject:
+            if nsd_stimulus_info_path == config.nsd_stimulus_info_path:
+                raise ValueError(
+                    "When subject is specified, nsd_stimulus_info_path must be provided and should be different from the default config.nsd_stimulus_info_path"
+                )
+            self.stimulus_info = pd.read_pickle(nsd_stimulus_info_path)
+            self.ids = self.stimulus_info["nsdId"].tolist()
+            self.id_key = "nsd_id"
+        else:
+            self.stimulus_info = pd.read_pickle(nsd_stimulus_info_path)
+            self.ids = self.stimulus_info["cocoId"].tolist()
+            self.id_key = "image_id"
 
+        self._len = len(self.ids)
+
+        # load image stimuli in NSD
+        # Note that we read all stimuli into RAM here.
+        with h5py.File(nsd_stimulus_path, "r") as h5_file:
+            images_np = h5_file["imgBrick"][:]
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # load text embeddings
-        text_embedding_train_path = config.text_embeddings_train_path
-        text_embedding_test_path = config.text_embeddings_val_path
-        self.text_embeddings_train = torch.load(
-            text_embedding_train_path, map_location=torch.device("cpu")
+        text_embeddings = torch.load(
+            nsd_text_embeddings_path, map_location=torch.device(device)
         )
-        self.text_embeddings_test = torch.load(
-            text_embedding_test_path, map_location=torch.device("cpu")
-        )
+        # make sure that embeddings are L2 normalized (they should already be, but just in case)
+        norms = torch.linalg.norm(text_embeddings, dim=1, keepdim=True)
+        text_embeddings = text_embeddings / (norms + 1e-12)
+
+        # extract the stimuli corresponding to this subject if per-subject
+        if self._is_per_subject:
+            self.images_np = images_np[self.ids, :, :, :]
+            self.text_embeddings = text_embeddings[self.ids, :]
+        else:
+            self.images_np = images_np
+            self.text_embeddings = text_embeddings
 
     def __len__(self):
-        return len(self.stimulus_info_subject)
-
-    def _get_stimulus_info_subject(self, subject: Union[str, int]):
-        raise NotImplementedError()
+        return self._len
 
     def __getitem__(self, idx):
-        raise NotImplementedError(
-            "id will be different between text_embeddings and stimulus_info_subject, need to match them by image_id"
-        )
-        # image file path
-        # if self.stimulus_info_subject.iloc[idx]["cocoSplit"] == "train2017":
-        #     img_dir = self.coco_train_img_dir
-        #     text_embeddings = self.text_embeddings_train
-        # elif self.stimulus_info_subject.iloc[idx]["cocoSplit"] == "val2017":
-        #     img_dir = self.coco_val_img_dir
-        #     text_embeddings = self.text_embeddings_test
-        # else:
-        #     raise ValueError(
-        #         f"Invalid cocoSplit value: {self.stimulus_info_subject.iloc[idx]['cocoSplit']}"
-        #     )
+        # Image: uint8 HWC
+        img_np = self.images_np[idx]
+        if self.img_transform is not None:
+            image = self.img_transform(img_np)
+        else:
+            image = img_np
 
-        # image_id = self.stimulus_info_subject.iloc[idx]["cocoId"]
-        # img_path = os.path.join(img_dir, f"{image_id:012d}.jpg")
+        if isinstance(image, np.ndarray):
+            image = torch.from_numpy(image)
 
-        # image = Image.open(img_path).convert("RGB")
-        # image = self.img_transform(image)
+        # Embedding
+        text_embedding = self.text_embeddings[idx]
 
-        # # idx will be different between text_embeddings and stimulus_info_subject.
-        # # text_embedding = text_embeddings[idx].squeeze(0)  # 1, D -> D
-
-        # return {
-        #     "image": image,
-        #     "text_embedding": text_embeddings,
-        #     "image_id": image_id,
-        # }
+        return {
+            "image": image,
+            "text_embedding": text_embedding,
+            self.id_key: self.ids[idx],
+        }

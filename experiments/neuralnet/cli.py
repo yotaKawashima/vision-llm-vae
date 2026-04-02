@@ -5,6 +5,7 @@ import argparse
 import json
 import torch
 from pathlib import Path
+import numpy as np
 
 from . import models
 from . import models_resnet
@@ -13,11 +14,13 @@ from .datasets import (
     ApplyTransformSubset,
     CocoTextEmbeddingImageDataset,
     CocoH5Dataset,
-)  # , NSDStimulusDataset
+    NSDStimulusDataset,
+)
 from .training import DataParallelismTrainer
+from .evaluation import Evaluator
+from .activation_extraction import ActivationExtractor
 
-# from .evaluation import Evaluator
-
+from ..preprocessing.transform_activations import pca
 
 project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
@@ -60,6 +63,7 @@ class CommandLineInterface:
         self.encoder_checkpoint = None
         self.ae_checkpoint = None
         self.vae_checkpoint = None
+        self.temperature = None
 
     def run(self):
         """Runs the command-line interface."""
@@ -127,7 +131,7 @@ class CommandLineInterface:
         if self.command == "train":
             self.train()
         elif self.command == "evaluation":
-            self.evaluation()
+            self.evaluate()
         elif self.command == "activation-extraction":
             self.extract_activations(input_modality=self.input_modality)
 
@@ -226,6 +230,7 @@ class CommandLineInterface:
             self.gamma,
             self.delta,
             clip_grad_norm=self.clip_grad_norm,
+            temperature=self.temperature,
             initial_history=initial_history,
         )
 
@@ -236,73 +241,186 @@ class CommandLineInterface:
             f"Saved training history to {config.training_history_path}"
         )
 
-    def evaluation(self):
+    def evaluate(self):
         """Evaluates the model."""
-        raise NotImplementedError(
-            "Evaluation for h5 dataset not implemented yet. You need text embeddings for the dataset."
-        )
-        # # evaluate the model on the val split (no data drop for evaluation)
-        # if config.coco_version == "Doerig":
-        #     # Doerig et al Nat Mach Intell dataset
-        #     test_dataset = CocoH5Dataset(
-        #         h5_path=config.coco_doerig_h5_path,
-        #         split="test",
-        #         embedding_key="all_mpnet_base_v2_mean_embeddings",
-        #         img_transform=config.img_transform_h5,
-        #     )
-        # else:
-        #     # use val dataset from the original coco dataset for evaluation
-        #     test_dataset = CocoTextEmbeddingImageDataset(
-        #         split="val",
-        #         img_transform=config.img_transform,
-        #     )
+        # evaluate the model on the val split (no data drop for evaluation)
+        if config.coco_version == "Doerig":
+            # Doerig et al Nat Mach Intell dataset
+            test_dataset = NSDStimulusDataset(
+                subject=None,
+                nsd_stimulus_info_path=config.nsd_stimulus_info_path,
+                nsd_stimulus_path=config.nsd_stimulus_path,
+                nsd_text_embeddings_path=config.text_embeddings_nsd_path,
+                img_transform=config.img_transform_val_h5,
+            )
+        else:
+            # use val dataset from the original coco dataset for evaluation
+            test_dataset = CocoTextEmbeddingImageDataset(
+                split="val",
+                img_transform=config.img_transform_val,
+            )
 
-        # dataloader = torch.utils.data.DataLoader(
-        #     test_dataset,
-        #     batch_size=self.batch_size,
-        #     shuffle=False,
-        #     num_workers=self.num_workers,
-        #     pin_memory=True,
-        #     persistent_workers=True,
-        # )
-        # evaluator = Evaluator(self.model, dataloader, self.logger)
-        # evaluator.evaluate()
+        dataloader = torch.utils.data.DataLoader(
+            test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            pin_memory=True,
+            persistent_workers=True,
+            drop_last=False,
+            prefetch_factor=2,
+        )
+
+        evaluator = Evaluator(self.model, dataloader, self.logger)
+        loss_metrics, alignment_data = evaluator.evaluate(
+            model_type=self.model_type,
+            loss_type=self.loss_type,
+            recon_loss_type=self.recon_loss_type,
+            llm_alignment_loss_type=self.llm_alignment_loss_type,
+            target_alpha=self.alpha,
+            target_beta=self.beta,
+            target_gamma=self.gamma,
+            target_delta=self.delta,
+            temperature=self.temperature,
+        )
+
+        # save evaluation result
+        with open(config.evaluation_loss_path, "w", encoding="utf-8") as f:
+            json.dump(loss_metrics, f, indent=2)
+
+        self.logger.log_success(
+            f"Saved evaluation loss to {config.evaluation_loss_path}"
+        )
+
+        if self.model_type in ["ae", "beta_vae"]:
+            with open(
+                config.evaluation_alignment_data_path, "w", encoding="utf-8"
+            ) as f:
+                json.dump(alignment_data, f, indent=2)
+            self.logger.log_success(
+                f"Saved alignment data to {config.evaluation_alignment_data_path}"
+            )
+
+        img_mean = torch.tensor(config.img_mean).view(1, 3, 1, 1)
+        img_std = torch.tensor(config.img_std).view(1, 3, 1, 1)
+
+        # try reconstruction
+        evaluator.image_reconstruction(
+            model_type=self.model_type,
+            fig_dir_path=config.evaluation_data_dir_path,
+            img_mean=img_mean,
+            img_std=img_std,
+            num_images=50,
+            num_images_per_fig=5,
+        )
 
     def extract_activations(self, input_modality="image"):
         """Extracts activations from the model on the dataset."""
-        raise NotImplementedError()
-        # # train data for each subject
-        # for subject in config.subjects:
-        #     dataset = NSDStimulusDataset(subject=subject)
+        if config.coco_version != "Doerig":
+            raise ValueError(
+                "Activation extraction is only implemented for the Doerig et al Nat Mach Intell dataset."
+            )
+        if input_modality not in ["image"]:
+            raise ValueError(
+                f"input_modality '{input_modality}' specified. Must be 'image'."
+            )
+        # Extract activations for special 515. We need to apply the same PCA preprocessing as each participant data.
+        activation_data_special1515 = self._extract_activations_each_subject(
+            subject="special515", input_modality=input_modality
+        )
 
-        #     dataloader = torch.utils.data.DataLoader(
-        #         dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers, persistent_workers=True, pin_memory=True
-        #     )
+        for subject in config.subjects:
+            activation_data_this_subject = self._extract_activations_each_subject(
+                subject=subject, input_modality=input_modality
+            )
 
-        #     # Extracts activations
-        #     extractor = ActivationExtractor(
-        #         self.model,
-        #         dataloader,
-        #         self.logger,
-        #         self.target_layers,
-        #         config.model_activation_path,
-        #     )
-        #     extractor.extract(input_modality=input_modality, vision_bias=self.vision_bias)
+            for layer_name in activation_data_this_subject:
+                # torch to numpy
+                activation_data_this_layer = (
+                    activation_data_this_subject[layer_name].cpu().numpy()
+                )
+                activation_data_special1515_this_layer = (
+                    activation_data_special1515[layer_name].cpu().numpy()
+                )
 
-        # # Test data
-        # dataset = NSDStimulusDataset(subject="test")
-        # dataloader = torch.utils.data.DataLoader(
-        #     dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers, persistent_workers=True, pin_memory=True
-        # )
-        # # Extracts activations
-        # extractor = ActivationExtractor(
-        #     self.model,
-        #     dataloader,
-        #     self.logger,
-        #     self.target_layers,
-        #     config.model_activation_path,
-        # )
-        # extractor.extract(input_modality=input_modality, vision_bias=self.vision_bias)
+                # Apply PCA
+                (
+                    activation_data_this_subject_after_pca,
+                    activation_data_special1515_after_pca,
+                ) = pca(
+                    activation_data_this_layer,
+                    activation_data_special1515_this_layer,
+                    n_components=config.pca_n_components,
+                )
+                # save PCA-transformed activations as numpy
+                model_activation_path = config.model_activation_path_template(
+                    subject=subject,
+                    layer_name=layer_name,
+                    split="NOTspecial515",
+                    input_modality=input_modality,
+                )
+                np.save(model_activation_path, activation_data_this_subject_after_pca)
+                self.logger.log_success(
+                    f"Saved activations to {model_activation_path}."
+                )
+                model_activation_path = config.model_activation_path_template(
+                    subject=subject,
+                    layer_name=layer_name,
+                    split="special515",
+                    input_modality=input_modality,
+                )
+                np.save(model_activation_path, activation_data_special1515_after_pca)
+                self.logger.log_success(
+                    f"Saved activations to {model_activation_path}."
+                )
+
+    def _extract_activations_each_subject(self, subject, input_modality="image"):
+        """
+        Extracts activations from the model on the dataset for each subject.
+        Parameters
+        ----------
+        subject: str
+            The subject for which to extract activations.
+        input_modality: str
+            The modality of input data to the model when extracting model activations. Must be "image" for now since text activation extraction is not implemented yet.
+
+        Returns
+        -------
+        dict
+            A dictionary containing the extracted activations for the subject. The keys are the layer names and the torch.tensor activations (batch_size, feature_size).
+        """
+
+        nsd_stimulus_info_path_this_subject = (
+            config.nsd_stimulus_info_path_this_subject(subject)
+        )
+
+        dataset = NSDStimulusDataset(
+            subject=subject,
+            nsd_stimulus_info_path=nsd_stimulus_info_path_this_subject,
+            nsd_stimulus_path=config.nsd_stimulus_path,
+            nsd_text_embeddings_path=config.text_embeddings_nsd_path,
+            img_transform=config.img_transform_val_h5,
+        )
+
+        dataloader = torch.utils.data.DataLoader(
+            dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            persistent_workers=True,
+            pin_memory=True,
+        )
+
+        # Extracts activations
+        extractor = ActivationExtractor(
+            self.model,
+            dataloader,
+            self.logger,
+            self.target_layers,
+        )
+        return extractor.extract(
+            input_modality=input_modality, vision_bias=self.vision_bias
+        )
 
     def parse_command_line_arguments(self):
         """Parses the command line arguments of the application."""
@@ -441,13 +559,6 @@ class CommandLineInterface:
             help="The beta value for the beta-VAE loss function. Defaults to config.beta.",
         )
         train_command_parser.add_argument(
-            "--clip-grad-norm",
-            dest="clip_grad_norm",
-            type=float,
-            default=config.clip_grad_norm,
-            help="The maximum norm for gradient clipping. Defaults to None (no clipping).",
-        )
-        train_command_parser.add_argument(
             "-G",
             "--gamma",
             dest="gamma",
@@ -462,6 +573,13 @@ class CommandLineInterface:
             type=float,
             default=config.delta,
             help="The weight for the norm loss when loss_type is l2_and_img_norm. Defaults to config.delta.",
+        )
+        train_command_parser.add_argument(
+            "--clip-grad-norm",
+            dest="clip_grad_norm",
+            type=float,
+            default=config.clip_grad_norm,
+            help="The maximum norm for gradient clipping. Defaults to None (no clipping).",
         )
         train_command_parser.add_argument(
             "--writer-path",
@@ -490,6 +608,13 @@ class CommandLineInterface:
             action=argparse.BooleanOptionalAction,
             default=config.vae_checkpoint,
             help="The path to the vae checkpoint to initialize the vae model with (only applicable for beta_vae model). Defaults to config.vae_checkpoint.",
+        )
+        train_command_parser.add_argument(
+            "--temperature",
+            dest="temperature",
+            type=float,
+            default=config.temperature,
+            help="Temperature for soft_nn loss. Defaults to config.temperature.",
         )
 
     @staticmethod
@@ -533,6 +658,66 @@ class CommandLineInterface:
             type=str,
             default=config.model_type,
             help="Sets the model type. Defaults to config.model_type.",
+        )
+        evaluation_command_parser.add_argument(
+            "--loss-type",
+            dest="loss_type",
+            type=str,
+            default=config.loss_type,
+            help="The type of loss to use. Defaults to config.loss_type.",
+        )
+        evaluation_command_parser.add_argument(
+            "--recon-loss-type",
+            dest="recon_loss_type",
+            type=str,
+            default=config.recon_loss_type,
+            help="The type of reconstructionloss to use. Defaults to config.recon_loss_type.",
+        )
+        evaluation_command_parser.add_argument(
+            "--llm-alignment-loss-type",
+            dest="llm_alignment_loss_type",
+            type=str,
+            default=config.llm_alignment_loss_type,
+            help="The type of LLM alignment loss to use. Defaults to config.llm_alignment_loss_type.",
+        )
+        evaluation_command_parser.add_argument(
+            "-A",
+            "--alpha",
+            dest="alpha",
+            type=float,
+            default=config.alpha,
+            help="The weight for cosine similarity loss for the encoder. Defaults to config.alpha.",
+        )
+        evaluation_command_parser.add_argument(
+            "-B",
+            "--beta",
+            dest="beta",
+            type=float,
+            default=config.beta,
+            help="The beta value for the beta-VAE loss function. Defaults to config.beta.",
+        )
+        evaluation_command_parser.add_argument(
+            "-G",
+            "--gamma",
+            dest="gamma",
+            type=float,
+            default=config.gamma,
+            help="The weight for llm direction alignment loss. Defaults to config.gamma.",
+        )
+        evaluation_command_parser.add_argument(
+            "-D",
+            "--delta",
+            dest="delta",
+            type=float,
+            default=config.delta,
+            help="The weight for the norm loss when loss_type is l2_and_img_norm. Defaults to config.delta.",
+        )
+        evaluation_command_parser.add_argument(
+            "--temperature",
+            dest="temperature",
+            type=float,
+            default=config.temperature,
+            help="Temperature for soft_nn loss. Defaults to config.temperature.",
         )
 
     @staticmethod

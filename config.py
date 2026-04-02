@@ -6,7 +6,7 @@ sys.path.insert(0, str(project_root))
 
 import numpy as np
 import torchvision.transforms as T
-from experiments.utils import replace_subdir  # get_last_checkpoint_path
+from experiments.utils import replace_subdir
 
 
 ############################################################################
@@ -14,6 +14,7 @@ from experiments.utils import replace_subdir  # get_last_checkpoint_path
 text_embeddings_summary = True  # if true, use mean and var embeddings across captions
 sentence_transformer_model_name = "all-mpnet-base-v2"
 text_embedding_dim = 768
+pca_n_components = text_embedding_dim
 ############################################################################
 
 num_workers = 2
@@ -26,21 +27,18 @@ batch_size = 128
 learning_rate = 0.0005
 clip_grad_norm = 1.0
 ###### Model ######
-model_type = "beta_vae_llm"  # "encoder", "ae", "beta_vae", "beta_vae_llm", "decoder"
+model_type = "beta_vae"  # "encoder", "ae", "beta_vae", "beta_vae_llm", "decoder"
 resnet_flag = False
 latent_dim = text_embedding_dim
 # checkpoint_path = None
 checkpoint_path = Path(
     "/mnt/data/checkpoints/beta_vae_loss_llm_alignment_beta0.001_recon_loss_l2_llm_alignment_loss_cosine_similarity_gamma0.5/cocoDoerig/run_0/checkpoint_epoch30.ckpt"
 )  # or None
-#     "/mnt/data/checkpoints/ae_loss_l2/cocoDoerig/run_0/checkpoint_epoch25.ckpt"
-# )  # or None
 #     "/mnt/data/checkpoints/vanilla_ae_loss_l2/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
 # )  # or None
 encoder_checkpoint = False  # whether to initialize the encoder with the checkpoint from the encoder model (only applicable for ae model)
 ae_checkpoint = False  # whether to initialize the ae model with the checkpoint from the ae model (only applicable for beta_vae model)
 vae_checkpoint = True  # whether to initialize the vae model with the checkpoint from the vae model (only applicable for beta_vae_llm model)
-last_checkpoint_path = None  # for activation extraction
 loss_type = None
 beta = None
 gamma = None
@@ -237,8 +235,24 @@ else:  # no data augmentation for image reconstruction models
 
 ############################################################################
 ###### Variable related to data path ######
-data_dir_path = Path("/mnt/data/")
-coco_version = "Doerig"  # "2017"
+data_dir_path = Path("/workspace/data/")
+coco_version = "Doerig"
+coco_caption_dir = data_dir_path / "coco"
+nsd_stimulus_path = data_dir_path / "nsd" / "nsd_stim" / "nsd_stimuli.hdf5"
+nsd_stimulus_info_dir_path = data_dir_path / "nsd" / "nsd_stim"
+nsd_stimulus_info_path = nsd_stimulus_info_dir_path / "nsd_stim_info_merged.pkl"
+
+
+def nsd_stimulus_info_path_this_subject(subject_id):
+    if subject_id == "special515":
+        return nsd_stimulus_info_dir_path / "nsd_stim_info_special515.pkl"
+    else:
+        return (
+            nsd_stimulus_info_dir_path
+            / f"subj{int(subject_id):02d}_nsd_stim_info_NOTspecial515.pkl"
+        )
+
+
 ############################################################################
 
 ############################################################################
@@ -279,21 +293,24 @@ subjects = [1, 2, 3, 4, 5, 6, 7, 8]
 ###### Paths ######
 if coco_version == "Doerig":
     coco_doerig_h5_path = (
-        data_dir_path / "ms_coco_embeddings_square256_proper_chunks.h5"
+        coco_caption_dir / "ms_coco_embeddings_square256_proper_chunks.h5"
     )
-else:
-    raw_coco_data_dir_path = data_dir_path / "raw" / f"coco{coco_version}"
-    coco_caption_train_path = (
-        raw_coco_data_dir_path / "annotations" / f"captions_train{coco_version}.json"
-    )
-    coco_caption_val_path = (
-        raw_coco_data_dir_path / "annotations" / f"captions_val{coco_version}.json"
-    )
-    coco_image_train_dir_path = (
-        raw_coco_data_dir_path / "images" / f"train{coco_version}"
-    )
-    coco_image_val_dir_path = raw_coco_data_dir_path / "images" / f"val{coco_version}"
 
+else:
+    raise ValueError(
+        f"Unsupported COCO version '{coco_version}' specified in the configuration."
+    )
+    # raw_coco_data_dir_path = data_dir_path / "raw" / f"coco{coco_version}"
+    # coco_caption_train_path = (
+    #     raw_coco_data_dir_path / "annotations" / f"captions_train{coco_version}.json"
+    # )
+    # coco_caption_val_path = (
+    #     raw_coco_data_dir_path / "annotations" / f"captions_val{coco_version}.json"
+    # )
+    # coco_image_train_dir_path = (
+    #     raw_coco_data_dir_path / "images" / f"train{coco_version}"
+    # )
+    # coco_image_val_dir_path = raw_coco_data_dir_path / "images" / f"val{coco_version}"
 
 # preprocessed data
 preprocessed_data_dir_path = data_dir_path / "preprocessed"
@@ -309,12 +326,17 @@ else:
     text_embeddings_file_name = "text_embeddings"
     text_embeddings_meta_file_name = "meta_text_embeddings"
 
-text_embeddings_train_path = (
-    text_embeddings_dir_path / f"{text_embeddings_file_name}_train{coco_version}.pt"
+# text_embeddings_train_path = (
+#     text_embeddings_dir_path / f"{text_embeddings_file_name}_train{coco_version}.pt"
+# )
+# text_embeddings_val_path = (
+#     text_embeddings_dir_path / f"{text_embeddings_file_name}_val{coco_version}.pt"
+# )
+
+text_embeddings_nsd_path = (
+    text_embeddings_dir_path / f"{text_embeddings_file_name}_nsd{coco_version}.pt"
 )
-text_embeddings_val_path = (
-    text_embeddings_dir_path / f"{text_embeddings_file_name}_val{coco_version}.pt"
-)
+
 if text_embeddings_summary:
     text_embeddings_train_var_path = (
         text_embeddings_dir_path
@@ -324,6 +346,11 @@ if text_embeddings_summary:
         text_embeddings_dir_path
         / f"{text_embeddings_var_file_name}_val{coco_version}.pt"
     )
+    text_embeddings_nsd_var_path = (
+        text_embeddings_dir_path
+        / f"{text_embeddings_var_file_name}_nsd{coco_version}.pt"
+    )
+
 
 text_embeddings_meta_train_path = (
     text_embeddings_dir_path
@@ -333,6 +360,12 @@ text_embeddings_meta_val_path = (
     text_embeddings_dir_path
     / f"{text_embeddings_meta_file_name}_val{coco_version}.json"
 )
+
+text_embeddings_nsd_meta_path = (
+    text_embeddings_dir_path
+    / f"{text_embeddings_meta_file_name}_nsd{coco_version}.json"
+)
+
 
 empty_embedding_data_path = text_embeddings_dir_path / "empty_text_embedding.pt"
 
@@ -352,23 +385,30 @@ writer_path = (
     / f"run_{run_id}"
 )
 training_history_path = coco_checkpoints_dir_path / "training_history.json"
+evaluation_data_dir_path = coco_checkpoints_dir_path / "evaluation"
+evaluation_data_dir_path.mkdir(parents=True, exist_ok=True)
+evaluation_loss_path = evaluation_data_dir_path / "evaluation_loss.json"
+evaluation_alignment_data_path = evaluation_data_dir_path / "alignment_data.json"
+
 
 # model activations data
-if last_checkpoint_path is not None:
-    model_activation_file_name = last_checkpoint_path.parent / (
-        last_checkpoint_path.stem + "_activations.pt"
-    )
-    model_activation_path = replace_subdir(
-        model_activation_file_name,
+if checkpoint_path is not None:
+    model_activation_dir_path = replace_subdir(
+        checkpoint_path.parent,
         "checkpoints",
         "model_activations",
     )
+    model_activation_dir_path.mkdir(parents=True, exist_ok=True)
 
-    model_activation_path = model_activation_path / input_modality
+    def model_activation_path_template(subject, layer_name, split, input_modality):
+        return model_activation_dir_path / (
+            f"subj{int(subject):02d}_input_{input_modality}_layer_{layer_name}"
+            + checkpoint_path.stem
+            + f"_{split}.npy"
+        )
+
 
 # fmri data
-nsd_stimulus_info_path = data_dir_path / "nsd" / "nsd_stimulus_info.pkl"
-
 fmri_dir_name = "nsd_fmri"
 fmri_file_name = "betas_average_fsaverage"
 fmri_file_extension = ".npy"
