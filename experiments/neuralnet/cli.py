@@ -266,7 +266,6 @@ class CommandLineInterface:
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,
-            persistent_workers=True,
             drop_last=False,
         )
 
@@ -406,7 +405,6 @@ class CommandLineInterface:
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            persistent_workers=True,
             pin_memory=True,
         )
 
