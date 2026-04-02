@@ -341,11 +341,8 @@ class NSDStimulusDataset(Dataset):
         with h5py.File(nsd_stimulus_path, "r") as h5_file:
             images_np = h5_file["imgBrick"][:]
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # load text embeddings
-        text_embeddings = torch.load(
-            nsd_text_embeddings_path, map_location=torch.device(device)
-        )
+        text_embeddings = torch.load(nsd_text_embeddings_path, map_location="cpu")
         # make sure that embeddings are L2 normalized (they should already be, but just in case)
         norms = torch.linalg.norm(text_embeddings, dim=1, keepdim=True)
         text_embeddings = text_embeddings / (norms + 1e-12)
