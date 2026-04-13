@@ -62,7 +62,8 @@ class ActivationExtractor:
         """
 
         for name, module in self.model.named_modules():
-            if self._match_layer_name(name):
+            class_name = type(module).__name__
+            if self._match_layer_name(name) or self._match_layer_name(class_name):
                 handle = module.register_forward_hook(self._get_hook(name))
                 self.hook_handles.append(handle)
 
