@@ -126,52 +126,56 @@ class CocoTextEmbeddingImageDataset(Dataset):
         split,
         img_transform=None,
     ):
-        self.split = split
-        if not config.text_embeddings_summary:
-            raise NotImplementedError(
-                "Only text_embeddings_summary=True is supported now."
-            )
-
-        # image
-        if split == "train":
-            self.img_dir = config.coco_image_train_dir_path
-            text_embedding_path = config.text_embeddings_train_path
-            meta_data_path = config.text_embeddings_meta_train_path
-        elif split == "val":
-            self.img_dir = config.coco_image_val_dir_path
-            text_embedding_path = config.text_embeddings_val_path
-            meta_data_path = config.text_embeddings_meta_val_path
-        else:
-            raise ValueError(f"Invalid split value: {split}")
-
-        # load image ids from meta data
-        with open(meta_data_path, "r") as f:
-            meta_data = json.load(f)
-        self.image_ids = [int(item["image_id"]) for item in meta_data]
-        del meta_data
-
-        # load text embeddings
-        self.text_embeddings = torch.load(
-            text_embedding_path, map_location=torch.device("cpu")
+        raise NotImplementedError(
+            "This dataset is deprecated. Please use CocoH5Dataset instead."
         )
 
-        self.img_transform = img_transform
+    #     self.split = split
+    #     if not config.text_embeddings_summary:
+    #         raise NotImplementedError(
+    #             "Only text_embeddings_summary=True is supported now."
+    #         )
 
-    def __len__(self):
-        return len(self.image_ids)
+    #     # image
+    #     if split == "train":
+    #         self.img_dir = config.coco_image_train_dir_path
+    #         text_embedding_path = config.text_embeddings_train_path
+    #         meta_data_path = config.text_embeddings_meta_train_path
+    #     elif split == "val":
+    #         self.img_dir = config.coco_image_val_dir_path
+    #         text_embedding_path = config.text_embeddings_val_path
+    #         meta_data_path = config.text_embeddings_meta_val_path
+    #     else:
+    #         raise ValueError(f"Invalid split value: {split}")
 
-    def __getitem__(self, idx):
-        img_path = os.path.join(self.img_dir, f"{self.image_ids[idx]:012d}.jpg")
-        image = Image.open(img_path).convert("RGB")
-        if self.img_transform is not None:
-            image = self.img_transform(image)
-        text_embedding = self.text_embeddings[idx].squeeze(0)  # 1, D -> D
+    #     # load image ids from meta data
+    #     with open(meta_data_path, "r") as f:
+    #         meta_data = json.load(f)
+    #     self.image_ids = [int(item["image_id"]) for item in meta_data]
+    #     del meta_data
 
-        return {
-            "image": image,
-            "text_embedding": text_embedding,
-            "image_id": self.image_ids[idx],
-        }
+    #     # load text embeddings
+    #     self.text_embeddings = torch.load(
+    #         text_embedding_path, map_location=torch.device("cpu")
+    #     )
+
+    #     self.img_transform = img_transform
+
+    # def __len__(self):
+    #     return len(self.image_ids)
+
+    # def __getitem__(self, idx):
+    #     img_path = os.path.join(self.img_dir, f"{self.image_ids[idx]:012d}.jpg")
+    #     image = Image.open(img_path).convert("RGB")
+    #     if self.img_transform is not None:
+    #         image = self.img_transform(image)
+    #     text_embedding = self.text_embeddings[idx].squeeze(0)  # 1, D -> D
+
+    #     return {
+    #         "image": image,
+    #         "text_embedding": text_embedding,
+    #         "image_id": self.image_ids[idx],
+    #     }
 
 
 # Available embedding keys in the HDF5 file
@@ -343,6 +347,7 @@ class NSDStimulusDataset(Dataset):
         # load text embeddings
         text_embeddings = torch.load(nsd_text_embeddings_path, map_location="cpu")
         # make sure that embeddings are L2 normalized (they should already be, but just in case)
+        # pylint: disable=not-callable
         norms = torch.linalg.norm(text_embeddings, dim=1, keepdim=True)
         text_embeddings = text_embeddings / (norms + 1e-12)
 
