@@ -17,7 +17,7 @@ text_embedding_dim = 768
 pca_n_components = text_embedding_dim
 ############################################################################
 
-num_workers = 0
+num_workers = 0  # set to 0 when ealuation and activation extraction
 run_id = 0
 
 ############################################################################
@@ -37,8 +37,8 @@ checkpoint_path = Path(
 #     "/mnt/data/checkpoints/vanilla_ae_loss_l2/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
 # )  # or None
 encoder_checkpoint = False  # whether to initialize the encoder with the checkpoint from the encoder model (only applicable for ae model)
-ae_checkpoint = False  # whether to initialize the ae model with the checkpoint from the ae model (only applicable for beta_vae model)
-vae_checkpoint = True  # whether to initialize the vae model with the checkpoint from the vae model (only applicable for beta_vae_llm model)
+ae_checkpoint = True  # whether to initialize the ae model with the checkpoint from the ae model (only applicable for beta_vae model)
+vae_checkpoint = False  # whether to initialize the vae model with the checkpoint from the vae model (only applicable for beta_vae_llm model)
 loss_type = None
 beta = None
 gamma = None
@@ -59,7 +59,7 @@ MODEL_CONFIGS = {
         "loss_type": "l2",
     },
     "beta_vae": {
-        "loss_type": "standard",  # or "llm_alignment"
+        "loss_type": "llm_alignment",  # or "llm_alignment"
         "beta": 0.001,  # beta for KL divergence loss
         "recon_loss_type": "l2",
         "llm_alignment_loss_type": "cosine_similarity",
@@ -74,91 +74,6 @@ MODEL_CONFIGS = {
         "loss_type": "l2",
     },
 }
-
-# model to use
-current_cfg = MODEL_CONFIGS[model_type]
-
-if model_type == "encoder" and current_cfg.get("loss_type") in [
-    "soft_nn",
-    "norm_and_soft_nn",
-]:
-    if current_cfg.get("temperature") is None:
-        raise ValueError(
-            f"Temperature must be specified for encoder soft_nn-based loss. Current config: {current_cfg}"
-        )
-
-if (
-    model_type == "beta_vae"
-    and current_cfg.get("loss_type") == "llm_alignment"
-    and current_cfg.get("llm_alignment_loss_type") == "soft_nn"
-):
-    if current_cfg.get("temperature") is None:
-        raise ValueError(
-            f"Temperature must be specified for beta_vae soft_nn alignment loss. Current config: {current_cfg}"
-        )
-
-if model_type == "beta_vae" and current_cfg.get("loss_type") == "llm_alignment":
-    if current_cfg.get("llm_alignment_loss_type") not in [
-        "cosine_similarity",
-        "soft_nn",
-    ]:
-        raise ValueError(
-            "Supported llm alignment loss types for BetaVAE: cosine_similarity, soft_nn."
-        )
-# unpack the current config to global variables
-for key, value in current_cfg.items():
-    globals()[key] = value
-
-if resnet_flag:
-    full_model_name = "resnet18_" + model_type + f"_loss_{current_cfg['loss_type']}"
-else:
-    full_model_name = model_type + f"_loss_{current_cfg['loss_type']}"
-
-if model_type == "encoder":
-    full_model_name = full_model_name + f"_alpha{current_cfg['alpha']}"
-
-    if (
-        current_cfg.get("loss_type") in ["soft_nn", "norm_and_soft_nn"]
-        and current_cfg.get("temperature") is not None
-    ):
-        full_model_name = full_model_name + f"_temp{current_cfg['temperature']}"
-
-elif model_type == "beta_vae":
-    full_model_name = full_model_name + f"_beta{current_cfg['beta']}"
-
-    full_model_name = full_model_name + f"_recon_loss_{current_cfg['recon_loss_type']}"
-
-    if current_cfg["loss_type"] == "llm_alignment":
-        full_model_name = (
-            full_model_name
-            + f"_llm_alignment_loss_{current_cfg['llm_alignment_loss_type']}"
-            + f"_gamma{current_cfg['gamma']}"
-        )
-        if (
-            current_cfg.get("llm_alignment_loss_type") == "soft_nn"
-            and current_cfg.get("temperature") is not None
-        ):
-            full_model_name = full_model_name + f"_temp{current_cfg['temperature']}"
-    else:
-        if ae_checkpoint:
-            full_model_name = "vanilla_from_ae_" + full_model_name
-        else:
-            full_model_name = "vanilla_" + full_model_name
-
-
-elif model_type == "ae":
-    if not encoder_checkpoint:
-        full_model_name = "vanilla_" + full_model_name
-
-elif model_type == "beta_vae_llm":
-    full_model_name = full_model_name + f"_delta{current_cfg['delta']}"
-
-elif model_type in ["decoder"]:
-    pass
-else:
-    raise ValueError(
-        f"Unknown model type '{model_type}' specified in the configuration."
-    )
 ############################################################################
 ###### Image Transform ######
 if resnet_flag:
@@ -290,6 +205,93 @@ subjects = [1, 2, 3, 4, 5, 6, 7, 8]
 ############################################################################
 ###### The followings are fixed paths and related functions ######
 ############################################################################
+
+# model to use
+current_cfg = MODEL_CONFIGS[model_type]
+
+if model_type == "encoder" and current_cfg.get("loss_type") in [
+    "soft_nn",
+    "norm_and_soft_nn",
+]:
+    if current_cfg.get("temperature") is None:
+        raise ValueError(
+            f"Temperature must be specified for encoder soft_nn-based loss. Current config: {current_cfg}"
+        )
+
+if (
+    model_type == "beta_vae"
+    and current_cfg.get("loss_type") == "llm_alignment"
+    and current_cfg.get("llm_alignment_loss_type") == "soft_nn"
+):
+    if current_cfg.get("temperature") is None:
+        raise ValueError(
+            f"Temperature must be specified for beta_vae soft_nn alignment loss. Current config: {current_cfg}"
+        )
+
+if model_type == "beta_vae" and current_cfg.get("loss_type") == "llm_alignment":
+    if current_cfg.get("llm_alignment_loss_type") not in [
+        "cosine_similarity",
+        "soft_nn",
+    ]:
+        raise ValueError(
+            "Supported llm alignment loss types for BetaVAE: cosine_similarity, soft_nn."
+        )
+# unpack the current config to global variables
+for key, value in current_cfg.items():
+    globals()[key] = value
+
+if resnet_flag:
+    full_model_name = "resnet18_" + model_type + f"_loss_{current_cfg['loss_type']}"
+else:
+    full_model_name = model_type + f"_loss_{current_cfg['loss_type']}"
+
+if model_type == "encoder":
+    full_model_name = full_model_name + f"_alpha{current_cfg['alpha']}"
+
+    if (
+        current_cfg.get("loss_type") in ["soft_nn", "norm_and_soft_nn"]
+        and current_cfg.get("temperature") is not None
+    ):
+        full_model_name = full_model_name + f"_temp{current_cfg['temperature']}"
+
+elif model_type == "beta_vae":
+    full_model_name = full_model_name + f"_beta{current_cfg['beta']}"
+
+    full_model_name = full_model_name + f"_recon_loss_{current_cfg['recon_loss_type']}"
+
+    if current_cfg["loss_type"] == "llm_alignment":
+        full_model_name = (
+            full_model_name
+            + f"_llm_alignment_loss_{current_cfg['llm_alignment_loss_type']}"
+            + f"_gamma{current_cfg['gamma']}"
+        )
+        if (
+            current_cfg.get("llm_alignment_loss_type") == "soft_nn"
+            and current_cfg.get("temperature") is not None
+        ):
+            full_model_name = full_model_name + f"_temp{current_cfg['temperature']}"
+    else:
+        if ae_checkpoint:
+            full_model_name = "vanilla_from_ae_" + full_model_name
+        else:
+            full_model_name = "vanilla_" + full_model_name
+
+
+elif model_type == "ae":
+    if not encoder_checkpoint:
+        full_model_name = "vanilla_" + full_model_name
+
+elif model_type == "beta_vae_llm":
+    full_model_name = full_model_name + f"_delta{current_cfg['delta']}"
+
+elif model_type in ["decoder"]:
+    pass
+else:
+    raise ValueError(
+        f"Unknown model type '{model_type}' specified in the configuration."
+    )
+
+
 ###### Paths ######
 if coco_version == "Doerig":
     coco_doerig_h5_path = (
@@ -385,11 +387,15 @@ writer_path = (
     / f"run_{run_id}"
 )
 training_history_path = coco_checkpoints_dir_path / "training_history.json"
-evaluation_data_dir_path = coco_checkpoints_dir_path / "evaluation"
-evaluation_data_dir_path.mkdir(parents=True, exist_ok=True)
-evaluation_loss_path = evaluation_data_dir_path / "evaluation_loss.json"
-evaluation_alignment_data_path = evaluation_data_dir_path / "alignment_data.json"
 
+evaluation_data_dir_path = checkpoint_path.parent / "evaluation"
+evaluation_data_dir_path.mkdir(parents=True, exist_ok=True)
+evaluation_loss_path = evaluation_data_dir_path / (
+    checkpoint_path.stem + "_evaluation_loss.json"
+)
+evaluation_alignment_data_path = evaluation_data_dir_path / (
+    checkpoint_path.stem + "_alignment_data.json"
+)
 
 # model activations data
 if checkpoint_path is not None:
