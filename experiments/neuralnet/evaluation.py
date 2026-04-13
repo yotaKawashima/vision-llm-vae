@@ -146,11 +146,15 @@ class Evaluator:
                     ).mean(dim=1)
                     recon_loss_list.extend(recon_mse_loss.detach().cpu().tolist())
 
+        # Average loss metrics over all samples
+        loss_metrics = {
+            k: v / val_num_processed_samples for k, v in loss_metrics.items()
+        }
+
         # Log results
         batch_log = "Evaluation Results:"
         for k, v in loss_metrics.items():
-            avg = v / val_num_processed_samples
-            batch_log += f", {k}: {avg:.4f}"
+            batch_log += f", {k}: {v:.4f}"
 
         self.logger.log_success(batch_log)
         self.logger.log_success("Finished evaluating the model")
