@@ -20,7 +20,8 @@ from .training import DataParallelismTrainer
 from .evaluation import Evaluator
 from .activation_extraction import ActivationExtractor
 
-from ..preprocessing.transform_activations import pca
+# from ..preprocessing.transform_activations import pca
+from ..analysis.rdm import compute_rdm_correlation
 
 project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
@@ -133,7 +134,7 @@ class CommandLineInterface:
         elif self.command == "evaluation":
             self.evaluate()
         elif self.command == "activation-extraction":
-            self.extract_activations(input_modality=self.input_modality)
+            self.extract_activations_and_rdm(input_modality=self.input_modality)
 
     def train(self):
         """Trains the model."""
@@ -312,8 +313,11 @@ class CommandLineInterface:
             num_images_per_fig=5,
         )
 
-    def extract_activations(self, input_modality="image"):
-        """Extracts activations from the model on the dataset."""
+    def extract_activations_and_rdm(self, input_modality="image"):
+        """
+        Extracts activations from the model on the dataset for rsa.
+        Only special 515 (without pca)
+        """
         if config.coco_version != "Doerig":
             raise ValueError(
                 "Activation extraction is only implemented for the Doerig et al Nat Mach Intell dataset."
@@ -327,50 +331,108 @@ class CommandLineInterface:
             subject="special515", input_modality=input_modality
         )
 
-        for subject in config.subjects:
-            activation_data_this_subject = self._extract_activations_each_subject(
-                subject=subject, input_modality=input_modality
+        # store each layer activations as numpy
+        for layer_name in activation_data_special1515:
+            # torch to numpy
+            activation_data_special1515_this_layer = (
+                activation_data_special1515[layer_name].cpu().numpy()
+            )
+            model_activation_path = config.model_activation_path_template(
+                subject="rdm_special515",
+                layer_name=layer_name,
+                split="special515",
+                input_modality=input_modality,
             )
 
-            for layer_name in activation_data_this_subject:
-                # torch to numpy
-                activation_data_this_layer = (
-                    activation_data_this_subject[layer_name].cpu().numpy()
-                )
-                activation_data_special1515_this_layer = (
-                    activation_data_special1515[layer_name].cpu().numpy()
-                )
+            # compute RDM
+            rdm_this_layer = compute_rdm_correlation(
+                activation_data_special1515_this_layer
+            )
+            np.save(model_activation_path, rdm_this_layer)
+            self.logger.log_success(f"Saved activations to {model_activation_path}.")
 
-                # Apply PCA
-                (
-                    activation_data_this_subject_after_pca,
-                    activation_data_special1515_after_pca,
-                ) = pca(
-                    activation_data_this_layer,
-                    activation_data_special1515_this_layer,
-                    n_components=config.pca_n_components,
-                )
-                # save PCA-transformed activations as numpy
-                model_activation_path = config.model_activation_path_template(
-                    subject=subject,
-                    layer_name=layer_name,
-                    split="NOTspecial515",
-                    input_modality=input_modality,
-                )
-                np.save(model_activation_path, activation_data_this_subject_after_pca)
-                self.logger.log_success(
-                    f"Saved activations to {model_activation_path}."
-                )
-                model_activation_path = config.model_activation_path_template(
-                    subject=subject,
-                    layer_name=layer_name,
-                    split="special515",
-                    input_modality=input_modality,
-                )
-                np.save(model_activation_path, activation_data_special1515_after_pca)
-                self.logger.log_success(
-                    f"Saved activations to {model_activation_path}."
-                )
+        # for subject in config.subjects:
+        #     activation_data_this_subject = self._extract_activations_each_subject(
+        #         subject=subject, input_modality=input_modality
+        #     )
+
+        #     for layer_name in activation_data_this_subject:
+        #         # torch to numpy
+        #         activation_data_this_layer = (
+        #             activation_data_this_subject[layer_name].cpu().numpy()
+        #         )
+
+        #         model_activation_path = config.model_activation_path_template(
+        #             subject=subject,
+        #             layer_name=layer_name,
+        #             split="special515",
+        #             input_modality=input_modality,
+        #         )
+        #         np.save(model_activation_path, activation_data_special1515_after_pca)
+        #         self.logger.log_success(
+        #             f"Saved activations to {model_activation_path}."
+        #         )
+
+    def extract_activations_encoding_model(self, input_modality="image"):
+        """Extracts activations from the model on the dataset. (for encoding model analysis)"""
+        raise NotImplementedError("This method is not implemented yet.")
+        # if config.coco_version != "Doerig":
+        #     raise ValueError(
+        #         "Activation extraction is only implemented for the Doerig et al Nat Mach Intell dataset."
+        #     )
+        # if input_modality not in ["image"]:
+        #     raise ValueError(
+        #         f"input_modality '{input_modality}' specified. Must be 'image'."
+        #     )
+        # # Extract activations for special 515. We need to apply the same PCA preprocessing as each participant data.
+        # activation_data_special1515 = self._extract_activations_each_subject(
+        #     subject="special515", input_modality=input_modality
+        # )
+
+        # for subject in config.subjects:
+        #     activation_data_this_subject = self._extract_activations_each_subject(
+        #         subject=subject, input_modality=input_modality
+        #     )
+
+        #     for layer_name in activation_data_this_subject:
+        #         # torch to numpy
+        #         activation_data_this_layer = (
+        #             activation_data_this_subject[layer_name].cpu().numpy()
+        #         )
+        #         activation_data_special1515_this_layer = (
+        #             activation_data_special1515[layer_name].cpu().numpy()
+        #         )
+
+        #         # Apply PCA
+        #         (
+        #             activation_data_this_subject_after_pca,
+        #             activation_data_special1515_after_pca,
+        #         ) = pca(
+        #             activation_data_this_layer,
+        #             activation_data_special1515_this_layer,
+        #             n_components=config.pca_n_components,
+        #         )
+        #         # save PCA-transformed activations as numpy
+        #         model_activation_path = config.model_activation_path_template(
+        #             subject=subject,
+        #             layer_name=layer_name,
+        #             split="NOTspecial515",
+        #             input_modality=input_modality,
+        #         )
+        #         np.save(model_activation_path, activation_data_this_subject_after_pca)
+        #         self.logger.log_success(
+        #             f"Saved activations to {model_activation_path}."
+        #         )
+        #         model_activation_path = config.model_activation_path_template(
+        #             subject=subject,
+        #             layer_name=layer_name,
+        #             split="special515",
+        #             input_modality=input_modality,
+        #         )
+        #         np.save(model_activation_path, activation_data_special1515_after_pca)
+        #         self.logger.log_success(
+        #             f"Saved activations to {model_activation_path}."
+        #         )
 
     def _extract_activations_each_subject(self, subject, input_modality="image"):
         """
@@ -385,7 +447,7 @@ class CommandLineInterface:
         Returns
         -------
         dict
-            A dictionary containing the extracted activations for the subject. The keys are the layer names and the torch.tensor activations (batch_size, feature_size).
+            A dictionary containing the extracted activations for the subject. The keys are the layer names and the torch.tensor activations (n_samples, n_features).
         """
 
         nsd_stimulus_info_path_this_subject = (

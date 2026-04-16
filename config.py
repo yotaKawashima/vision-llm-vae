@@ -388,14 +388,10 @@ writer_path = (
 )
 training_history_path = coco_checkpoints_dir_path / "training_history.json"
 
-evaluation_data_dir_path = checkpoint_path.parent / "evaluation"
+evaluation_data_dir_path = checkpoint_path.parent / "evaluation" / checkpoint_path.stem
 evaluation_data_dir_path.mkdir(parents=True, exist_ok=True)
-evaluation_loss_path = evaluation_data_dir_path / (
-    checkpoint_path.stem + "_evaluation_loss.json"
-)
-evaluation_alignment_data_path = evaluation_data_dir_path / (
-    checkpoint_path.stem + "_alignment_data.json"
-)
+evaluation_loss_path = evaluation_data_dir_path / "evaluation_loss.json"
+evaluation_alignment_data_path = evaluation_data_dir_path / "alignment_data.json"
 
 # model activations data
 if checkpoint_path is not None:
