@@ -337,10 +337,9 @@ class CommandLineInterface:
             activation_data_special1515_this_layer = (
                 activation_data_special1515[layer_name].cpu().numpy()
             )
-            model_activation_path = config.model_activation_path_template(
-                subject="rdm_special515",
+            model_rdm_path = config.model_rdm_path_template(
+                subject="special515",
                 layer_name=layer_name,
-                split="special515",
                 input_modality=input_modality,
             )
 
@@ -348,8 +347,8 @@ class CommandLineInterface:
             rdm_this_layer = compute_rdm_correlation(
                 activation_data_special1515_this_layer
             )
-            np.save(model_activation_path, rdm_this_layer)
-            self.logger.log_success(f"Saved activations to {model_activation_path}.")
+            np.save(model_rdm_path, rdm_this_layer)
+            self.logger.log_success(f"Saved RDM to {model_rdm_path}.")
 
         # for subject in config.subjects:
         #     activation_data_this_subject = self._extract_activations_each_subject(
