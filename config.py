@@ -400,6 +400,7 @@ if checkpoint_path is not None:
         "checkpoints",
         "model_activations",
     )
+    model_activation_dir_path = model_activation_dir_path / checkpoint_path.stem
     model_activation_dir_path.mkdir(parents=True, exist_ok=True)
 
 
@@ -418,15 +419,11 @@ def model_rdm_path_template(
 ):
     if subject == "special515":
         path = model_activation_dir_path / (
-            f"input_{input_modality}_layer_{layer_name}_"
-            + checkpoint_path.stem
-            + "_rdm_special515.npy"
+            f"input_{input_modality}_layer_{layer_name}_rdm_special515.npy"
         )
     else:
         path = model_activation_dir_path / (
-            f"subj{int(subject):02d}_input_{input_modality}_layer_{layer_name}_"
-            + checkpoint_path.stem
-            + "_rdm_NOTspecial515.npy"
+            f"subj{int(subject):02d}_input_{input_modality}_layer_{layer_name}_rdm_NOTspecial515.npy"
         )
     return path
 
