@@ -20,4 +20,6 @@ def compute_rdm_correlation(features):
     # normalize feature vectors to unit length
     f /= np.linalg.norm(f, axis=1, keepdims=True)
     corr_matrix = np.dot(f, f.T)
+    # corr_matrix can have values slightly outside the range [-1, 1] due to numerical precision issues
+    corr_matrix = np.clip(corr_matrix, -1.0, 1.0)
     return 1 - corr_matrix
