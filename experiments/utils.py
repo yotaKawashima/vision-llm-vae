@@ -8,8 +8,6 @@ from typing import Union
 project_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(project_root))
 
-import config
-
 
 def make_checkpoint_path(epoch: Union[int, str]) -> Path:
     """
@@ -23,6 +21,7 @@ def make_checkpoint_path(epoch: Union[int, str]) -> Path:
     Path
         The filesystem path to the requested checkpoint file.
     """
+    import config
 
     config.coco_checkpoints_dir_path.mkdir(parents=True, exist_ok=True)
 
@@ -132,6 +131,8 @@ def model_activation_path_template(
     Path
         The path to the requested model activation file.
     """
+    import config
+
     return config.model_activation_dir_path / (
         f"subj{int(subject):02d}_input_{input_modality}_layer_{layer_name}_"
         + config.checkpoint_path.stem
@@ -157,6 +158,8 @@ def model_rdm_path_template(
     Path
         The path to the requested model RDM file.
     """
+    import config
+
     if subject == "special515":
         path = config.model_activation_dir_path / (
             f"input_{input_modality}_layer_{layer_name}_rdm_special515.npy"
@@ -180,6 +183,8 @@ def fmri_data_path_template(subject: Union[str, int]):
     Path
         The path to the requested fMRI data file.
     """
+    import config
+
     fmri_file_name = f"subj{int(subject):02d}_betas_average_fsaverage_special515.npy"
 
     return config.fmri_dir_path / fmri_file_name
@@ -199,6 +204,8 @@ def fmri_rdm_path_template(subject: Union[str, int], roi: str):
     Path
         The path to the requested fMRI RDM file.
     """
+    import config
+
     path = config.fmri_rdm_dir_path / (
         f"subj{int(subject):02d}_{roi}_rdm_special515.npy"
     )
@@ -217,6 +224,7 @@ def regression_path_template(layer_name: str):
     Path
         The path to the requested regression result file.
     """
+    import config
 
     path = config.rsa_dir_path / f"rsa_rdm_{layer_name}_regression_special515.json"
     return path
