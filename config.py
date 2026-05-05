@@ -8,7 +8,6 @@ import numpy as np
 import torchvision.transforms as T
 from experiments.utils import replace_subdir
 
-
 ############################################################################
 ###### text embeddings ######
 text_embeddings_summary = True  # if true, use mean and var embeddings across captions
@@ -156,15 +155,18 @@ coco_caption_dir = data_dir_path / "coco"
 nsd_stimulus_path = data_dir_path / "nsd" / "nsd_stim" / "nsd_stimuli.hdf5"
 nsd_stimulus_info_dir_path = data_dir_path / "nsd" / "nsd_stim"
 nsd_stimulus_info_path = nsd_stimulus_info_dir_path / "nsd_stim_info_merged.pkl"
+roi_defs_dir_path = data_dir_path / "nsd" / "roi_defs"
+fmri_dir_path = data_dir_path / "nsd" / "nsd_fmri"
+fmri_rdm_dir_path = data_dir_path / "fmri_rdms"
 
 
-def nsd_stimulus_info_path_this_subject(subject_id):
-    if subject_id == "special515":
+def nsd_stimulus_info_path_this_subject(subject):
+    if subject == "special515":
         return nsd_stimulus_info_dir_path / "nsd_stim_info_special515.pkl"
     else:
         return (
             nsd_stimulus_info_dir_path
-            / f"subj{int(subject_id):02d}_nsd_stim_info_NOTspecial515.pkl"
+            / f"subj{int(subject):02d}_nsd_stim_info_NOTspecial515.pkl"
         )
 
 
@@ -173,21 +175,42 @@ def nsd_stimulus_info_path_this_subject(subject_id):
 ############################################################################
 ##### activation extraction for encoding model analysis #####
 target_layers = [
-    "ReLU",
-]  # ["conv2"]
+    "encoder.1.2",
+    "encoder.2.2",
+    "encoder.4.2",
+    "encoder.6.2",
+    "encoder.7.2",
+    "encoder.8.2",
+    "encoder.9.2",
+    "encoder.11.2",
+    "encoder.13.2",
+    "decoder.1.2",
+    "decoder.3.2",
+    "decoder.5.2",
+    "decoder.6.2",
+    "decoder.7.2",
+    "decoder.8.2",
+    "decoder.10.2",
+    "decoder.12.2",
+    "decoder.13.2",
+    "latent",
+    "mu",
+]
+# target_layers = ["ReLU"]
 vision_bias = 0.5
 input_modality = "image"
 ############################################################################
 
 ############################################################################
-##### encoding model #####
+##### rsa #####
 # regression hyperparameters
 # alphas = np.logspace(-3, 3, 7)
 alphas = np.logspace(-6, 6, 13)
 num_folds = 5
 
 # list of roi (streams and all)
-roi_list = [
+roi_class = "streams"
+list_rois = [
     "early",
     "midventral",
     "ventral",
@@ -198,7 +221,7 @@ roi_list = [
     "all",
 ]
 
-subjects = [1, 2, 3, 4, 5, 6, 7, 8]
+list_subjects = [1, 2, 3, 4, 5, 6, 7, 8]
 ############################################################################
 
 
@@ -403,43 +426,17 @@ if checkpoint_path is not None:
     model_activation_dir_path = model_activation_dir_path / checkpoint_path.stem
     model_activation_dir_path.mkdir(parents=True, exist_ok=True)
 
-
-def model_activation_path_template(subject, layer_name, split, input_modality):
-    return model_activation_dir_path / (
-        f"subj{int(subject):02d}_input_{input_modality}_layer_{layer_name}_"
-        + checkpoint_path.stem
-        + f"_{split}.npy"
-    )
+fmri_rdm_dir_path.mkdir(parents=True, exist_ok=True)
 
 
-def model_rdm_path_template(
-    subject,
-    layer_name,
-    input_modality,
-):
-    if subject == "special515":
-        path = model_activation_dir_path / (
-            f"input_{input_modality}_layer_{layer_name}_rdm_special515.npy"
-        )
-    else:
-        path = model_activation_dir_path / (
-            f"subj{int(subject):02d}_input_{input_modality}_layer_{layer_name}_rdm_NOTspecial515.npy"
-        )
-    return path
+rsa_dir_path = replace_subdir(
+    checkpoint_path.parent,
+    "checkpoints",
+    "rsa",
+)
+rsa_dir_path.mkdir(parents=True, exist_ok=True)
+noise_ceiling_path = data_dir_path / "rsa" / "rsa_rdm_noise_ceiling_special515.json"
 
-
-# fmri data
-fmri_dir_name = "nsd_fmri"
-fmri_file_name = "betas_average_fsaverage"
-fmri_file_extension = ".npy"
-fmri_dir_path = data_dir_path / fmri_dir_name
-# averaged_fmri_data_path = fmri_dir_path / f"averaged_{fmri_file_name}_test{fmri_file_extension}"
-
-# encoding model data
-encoding_model_dir_name = "encoding_model"
-encoding_model_file_name = "encoding_model"
-encoding_model_file_extension = ".npz"
-encoding_model_dir_path = data_dir_path / encoding_model_dir_name
 
 ###### Functions ######
 _model = None
