@@ -10,6 +10,7 @@ ALL_ROIS = [
     "lateral",
     "midparietal",
     "parietal",
+    "all",
 ]
 
 
@@ -26,7 +27,7 @@ def get_roi_mapping(
         Name of the NSD ROI to load. Default "streams".
     Returns
     -------
-    maskdata: np.ndarray
+    mapping: np.ndarray
         The loaded ROI data.
     roi_id2name: dict
         Mapping of ROI IDs to names.
@@ -95,8 +96,11 @@ def get_roi_mask(
     # load roi mapping
     mapping, roi_id2name = get_roi_mapping(roi_defs_dir_path, which_rois)
 
-    # check voxel for the target roi
-    target_roi_id = [key for key, value in roi_id2name.items() if value == roi][0]
-    mask = mapping == target_roi_id
+    if roi == "all":
+        mask = mapping != 0
+    else:
+        # check voxel for the target roi
+        target_roi_id = [key for key, value in roi_id2name.items() if value == roi][0]
+        mask = mapping == target_roi_id
 
     return mask
