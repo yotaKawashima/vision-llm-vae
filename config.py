@@ -155,7 +155,7 @@ coco_caption_dir = data_dir_path / "coco"
 nsd_stimulus_path = data_dir_path / "nsd" / "nsd_stim" / "nsd_stimuli.hdf5"
 nsd_stimulus_info_dir_path = data_dir_path / "nsd" / "nsd_stim"
 nsd_stimulus_info_path = nsd_stimulus_info_dir_path / "nsd_stim_info_merged.pkl"
-roi_defs_dir_path = data_dir_path / "nsd" / "roi_defs"
+roi_defs_dir_path = data_dir_path / "nsd" / "nsd_roi_defs"
 fmri_dir_path = data_dir_path / "nsd" / "nsd_fmri"
 fmri_rdm_dir_path = data_dir_path / "fmri_rdms"
 
