@@ -51,9 +51,11 @@ def compute_rdm_correlation(features):
         A 2D array of shape (n_samples, n_samples) containing the RDM values, where RDM[i, j] is the correlation distance between features[i] and features[j].
     """
     # subtract mean from each feature vector
-    f = features - features.mean(axis=1, keepdims=True)
+    f = features - np.nanmean(features, axis=1, keepdims=True)
     # normalize feature vectors to unit length
-    f /= np.linalg.norm(f, axis=1, keepdims=True)
+    norms = np.sqrt(np.nansum(f**2, axis=1, keepdims=True))
+    norms[norms == 0] = 1
+    f = np.nan_to_num(f / norms, nan=0.0)  # replace Nan with 0 after normalization
     corr_matrix = np.dot(f, f.T)
     # corr_matrix can have values slightly outside the range [-1, 1] due to numerical precision issues
     corr_matrix = np.clip(corr_matrix, -1.0, 1.0)
