@@ -19,9 +19,8 @@ from .datasets import (
 from .training import DataParallelismTrainer
 from .evaluation import Evaluator
 from .activation_extraction import ActivationExtractor
-
-# from ..preprocessing.transform_activations import pca
-from ..analysis.rdm import compute_rdm_correlation
+from .. import utils
+from ..analysis.rsa import compute_rdm_correlation
 
 project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
@@ -337,7 +336,7 @@ class CommandLineInterface:
             activation_data_special1515_this_layer = (
                 activation_data_special1515[layer_name].cpu().numpy()
             )
-            model_rdm_path = config.model_rdm_path_template(
+            model_rdm_path = utils.model_rdm_path_template(
                 subject="special515",
                 layer_name=layer_name,
                 input_modality=input_modality,

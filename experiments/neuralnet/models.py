@@ -95,8 +95,8 @@ class Encoder(BaseModel):
                 stride=1,
                 padding=padding,
             ),
-            nn.ReLU(),
             nn.LayerNorm([out_channels, spatial_size, spatial_size]),
+            nn.ReLU(),
         )
 
     def _freeze_encoder(self, freeze: bool = True) -> None:
