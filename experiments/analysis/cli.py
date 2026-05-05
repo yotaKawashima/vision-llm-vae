@@ -112,8 +112,9 @@ class CommandLineInterface:
         if arguments.command is None:
             argument_parser.print_help()
             sys.exit(0)
-
         self.command = arguments.command
+        for key, value in vars(arguments).items():
+            setattr(self, key, value)
 
     @staticmethod
     def add_brain_command(sub_parsers):
