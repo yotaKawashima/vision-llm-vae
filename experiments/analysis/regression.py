@@ -136,7 +136,7 @@ class Regression:
             brain_rdm_test = brain_rdm[test_mask]
 
             # estimate regression coefficients using least squares
-            c, _, _, _ = np.linalg.lstsq(model_rdms_train, brain_rdm_train, rcond=None)
+            c, _, _, _ = np.linalg.lstsq(model_rdms_train.astype(np.float64), brain_rdm_train.astype(np.float64), rcond=None)
 
             # evaluate the regression model on the test (spearman)
             brain_rdm_pred = model_rdms_test @ c
