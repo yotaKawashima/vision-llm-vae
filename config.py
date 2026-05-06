@@ -15,10 +15,8 @@ sentence_transformer_model_name = "all-mpnet-base-v2"
 text_embedding_dim = 768
 pca_n_components = text_embedding_dim
 ############################################################################
-
-num_workers = (
-    2  # set to 0 when ealuation and activation extraction (e.g. 2 for training)
-)
+# set to 0 when ealuation and activation extraction (e.g. 2 for training)
+num_workers = 2
 run_id = 1
 
 ############################################################################
@@ -30,6 +28,7 @@ clip_grad_norm = 1.0
 ###### Model ######
 model_type = "encoder"  # "encoder", "ae", "beta_vae", "beta_vae_llm", "decoder"
 resnet_flag = False
+eval_flag = False  # true to make relevant dirs for evaluation and activation extraction
 latent_dim = text_embedding_dim
 checkpoint_path = None
 # checkpoint_path = Path(
@@ -413,13 +412,14 @@ writer_path = (
 )
 training_history_path = coco_checkpoints_dir_path / "training_history.json"
 
-evaluation_data_dir_path = checkpoint_path.parent / "evaluation" / checkpoint_path.stem
-evaluation_data_dir_path.mkdir(parents=True, exist_ok=True)
-evaluation_loss_path = evaluation_data_dir_path / "evaluation_loss.json"
-evaluation_alignment_data_path = evaluation_data_dir_path / "alignment_data.json"
+if eval_flag:
+    evaluation_data_dir_path = (
+        checkpoint_path.parent / "evaluation" / checkpoint_path.stem
+    )
+    evaluation_data_dir_path.mkdir(parents=True, exist_ok=True)
+    evaluation_loss_path = evaluation_data_dir_path / "evaluation_loss.json"
+    evaluation_alignment_data_path = evaluation_data_dir_path / "alignment_data.json"
 
-# model activations data
-if checkpoint_path is not None:
     model_activation_dir_path = replace_subdir(
         checkpoint_path.parent,
         "checkpoints",
@@ -428,15 +428,14 @@ if checkpoint_path is not None:
     model_activation_dir_path = model_activation_dir_path / checkpoint_path.stem
     model_activation_dir_path.mkdir(parents=True, exist_ok=True)
 
+    rsa_dir_path = replace_subdir(
+        checkpoint_path.parent,
+        "checkpoints",
+        "rsa",
+    )
+    rsa_dir_path.mkdir(parents=True, exist_ok=True)
+
 fmri_rdm_dir_path.mkdir(parents=True, exist_ok=True)
-
-
-rsa_dir_path = replace_subdir(
-    checkpoint_path.parent,
-    "checkpoints",
-    "rsa",
-)
-rsa_dir_path.mkdir(parents=True, exist_ok=True)
 noise_ceiling_path = data_dir_path / "rsa" / "rsa_rdm_noise_ceiling_special515.json"
 
 
