@@ -187,7 +187,7 @@ class CocoH5Dataset(Dataset):
     """
     CocoH5Dataset
     -------------
-    PyTorch Dataset that reads COCO images and embeddings directly from an HDF5
+    PyTorch Dataset that reads COCO images and embeddings from an HDF5
     file (e.g. ms_coco_embeddings_square256_proper_chunks.h5).
 
     The HDF5 file must have the following structure::
@@ -248,11 +248,17 @@ class CocoH5Dataset(Dataset):
             logger.log_info(
                 f"Loading {split} dataset into RAM. This might take a minute..."
             )
-        self.h5_file = h5py.File(h5_path, "r")
-        self.coco_ids = self.h5_file[split]["coco_ids"][:].tolist()
-        self._len = len(self.coco_ids)  # number of samples in this split
-        self.images_np = self.h5_file[split]["data"]
-        self.embeddings_np = self.h5_file[split][self.embedding_key]
+
+        with h5py.File(h5_path, "r") as f:
+            self.coco_ids = f[split]["coco_ids"][:].tolist()
+            self._len = len(self.coco_ids)  # number of samples in this split
+
+            # Note: we read the entire image and embedding datasets into memory as numpy arrays.
+            self.images_np = f[split]["data"][:]
+            embeddings_np = f[split][self.embedding_key][:]
+            # make sure that embeddings are L2 normalized (they should already be, but just in case)
+            norms = np.linalg.norm(embeddings_np, axis=1, keepdims=True)
+            self.embeddings_np = embeddings_np / (norms + 1e-12)
 
         if logger is not None:
             logger.log_info("Done loading into RAM!")
@@ -273,9 +279,6 @@ class CocoH5Dataset(Dataset):
 
         # Embedding
         emb_np = self.embeddings_np[idx]
-        # make sure that embeddings are L2 normalized (they should already be, but just in case)
-        norms = np.linalg.norm(emb_np)
-        emb_np = emb_np / (norms + 1e-12)
         text_embedding = torch.from_numpy(emb_np)
 
         return {
@@ -283,9 +286,6 @@ class CocoH5Dataset(Dataset):
             "text_embedding": text_embedding,
             "image_id": self.coco_ids[idx],
         }
-
-    def __del__(self):
-        self.h5_file.close()
 
 
 class NSDStimulusDataset(Dataset):

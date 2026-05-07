@@ -188,22 +188,21 @@ class CommandLineInterface:
             shuffle=True,
             num_workers=self.num_workers,
             pin_memory=True,
-            persistent_workers=False,  # True,
+            persistent_workers=True,
             drop_last=True,
-            prefetch_factor=None,  # 2,
+            prefetch_factor=2,
         )
-        # val_num_workers = min(
-        #     4, int(len(val_dataset) // self.batch_size)
-        # )  # Use fewer workers for validation
-        # val_num_workers = max(1, val_num_workers)  # Ensure at least one worker
-        val_num_workers = 0
+        val_num_workers = min(
+            4, int(len(val_dataset) // self.batch_size)
+        )  # Use fewer workers for validation
+        val_num_workers = max(1, val_num_workers)  # Ensure at least one worker
         val_dataloader = torch.utils.data.DataLoader(
             val_dataset,
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=val_num_workers,
             pin_memory=True,
-            persistent_workers=False,  # True,
+            persistent_workers=True,
         )
 
         trainer = DataParallelismTrainer(
