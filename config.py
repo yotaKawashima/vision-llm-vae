@@ -15,8 +15,7 @@ sentence_transformer_model_name = "all-mpnet-base-v2"
 text_embedding_dim = 768
 pca_n_components = text_embedding_dim
 ############################################################################
-# set to 0 when ealuation and activation extraction (e.g. 2 for training)
-num_workers = 2
+num_workers = 0
 run_id = 1
 
 ############################################################################
