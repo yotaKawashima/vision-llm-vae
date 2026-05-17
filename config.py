@@ -25,7 +25,7 @@ batch_size = 128
 learning_rate = 0.0005
 clip_grad_norm = 1.0
 ###### Model ######
-model_type = "ae"  # "encoder", "ae", "beta_vae", "beta_vae_llm", "decoder"
+model_type = "beta_vae"  # "encoder", "ae", "beta_vae", "beta_vae_llm", "decoder"
 resnet_flag = False
 eval_flag = True  # true to make relevant dirs for evaluation and activation extraction
 latent_dim = text_embedding_dim
@@ -33,13 +33,14 @@ latent_dim = text_embedding_dim
 # checkpoint_path = Path(
 #     "/mnt/data/checkpoints/beta_vae_loss_llm_alignment_beta0.001_recon_loss_l2_llm_alignment_loss_cosine_similarity_gamma0.5/cocoDoerig/run_0/checkpoint_epoch30.ckpt"
 # )
-# checkpoint_path = Path(
-#     "/mnt/data/checkpoints/vanilla_from_ae_beta_vae_loss_standard_beta0.001_recon_loss_l2/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
-# )
 
 checkpoint_path = Path(
-    "/mnt/data/checkpoints/vanilla_ae_loss_l2/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
+    "/mnt/data/checkpoints/vanilla_from_ae_beta_vae_loss_standard_beta0.001_recon_loss_l2/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
 )
+
+# checkpoint_path = Path(
+#     "/mnt/data/checkpoints/vanilla_ae_loss_l2/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
+# )
 
 # checkpoint_path = Path(
 #     "/mnt/data/checkpoints/ae_loss_l2/cocoDoerig/run_0/checkpoint_epoch25.ckpt"
@@ -48,10 +49,10 @@ checkpoint_path = Path(
 
 encoder_checkpoint = False  # whether to initialize the encoder with the checkpoint from the encoder model
 ae_checkpoint = (
-    True  # whether to initialize the ae model with the checkpoint from the ae model
+    False  # whether to initialize the ae model with the checkpoint from the ae model
 )
 vae_checkpoint = (
-    False  # whether to initialize the vae model with the checkpoint from the vae model
+    True  # whether to initialize the vae model with the checkpoint from the vae model
 )
 loss_type = None
 beta = None
