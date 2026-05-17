@@ -25,7 +25,7 @@ batch_size = 128
 learning_rate = 0.0005
 clip_grad_norm = 1.0
 ###### Model ######
-model_type = "beta_vae"  # "encoder", "ae", "beta_vae", "beta_vae_llm", "decoder"
+model_type = "ae"  # "encoder", "ae", "beta_vae", "beta_vae_llm", "decoder"
 resnet_flag = False
 eval_flag = True  # true to make relevant dirs for evaluation and activation extraction
 latent_dim = text_embedding_dim
