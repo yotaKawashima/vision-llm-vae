@@ -16,7 +16,7 @@ text_embedding_dim = 768
 pca_n_components = text_embedding_dim
 ############################################################################
 num_workers = 2
-run_id = 1
+run_id = 0
 
 ############################################################################
 ####### Training Hyperparameters ######
@@ -25,19 +25,20 @@ batch_size = 128
 learning_rate = 0.0005
 clip_grad_norm = 1.0
 ###### Model ######
-model_type = "encoder"  # "encoder", "ae", "beta_vae", "beta_vae_llm", "decoder"
+model_type = "beta_vae"  # "encoder", "ae", "beta_vae", "beta_vae_llm", "decoder"
 resnet_flag = False
-eval_flag = False  # true to make relevant dirs for evaluation and activation extraction
+eval_flag = True  # true to make relevant dirs for evaluation and activation extraction
 latent_dim = text_embedding_dim
-checkpoint_path = None
+# checkpoint_path = None
 # checkpoint_path = Path(
 #     "/mnt/data/checkpoints/beta_vae_loss_llm_alignment_beta0.001_recon_loss_l2_llm_alignment_loss_cosine_similarity_gamma0.5/cocoDoerig/run_0/checkpoint_epoch30.ckpt"
 # )
-#     "/mnt/data/checkpoints/vanilla_ae_loss_l2/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
-# )  # or None
+checkpoint_path = Path(
+    "/mnt/data/checkpoints/vanilla_from_ae_beta_vae_loss_standard_beta0.001_recon_loss_l2/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
+)
 encoder_checkpoint = False  # whether to initialize the encoder with the checkpoint from the encoder model (only applicable for ae model)
 ae_checkpoint = False  # whether to initialize the ae model with the checkpoint from the ae model (only applicable for beta_vae model)
-vae_checkpoint = False  # whether to initialize the vae model with the checkpoint from the vae model (only applicable for beta_vae_llm model)
+vae_checkpoint = True  # whether to initialize the vae model with the checkpoint from the vae model (only applicable for beta_vae_llm model)
 loss_type = None
 beta = None
 gamma = None
@@ -58,7 +59,7 @@ MODEL_CONFIGS = {
         "loss_type": "l2",
     },
     "beta_vae": {
-        "loss_type": "llm_alignment",  # or "llm_alignment"
+        "loss_type": "standard",  # or "llm_alignment"
         "beta": 0.001,  # beta for KL divergence loss
         "recon_loss_type": "l2",
         "llm_alignment_loss_type": "cosine_similarity",

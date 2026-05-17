@@ -95,9 +95,22 @@ class Encoder(BaseModel):
                 stride=1,
                 padding=padding,
             ),
-            nn.LayerNorm([out_channels, spatial_size, spatial_size]),
             nn.ReLU(),
+            nn.LayerNorm([out_channels, spatial_size, spatial_size]),
         )
+
+        # LayerNorm -> ReLU
+        # return nn.Sequential(
+        #     nn.Conv2d(
+        #         in_channels,
+        #         out_channels,
+        #         kernel_size=kernel_size,
+        #         stride=1,
+        #         padding=padding,
+        #     ),
+        #     nn.LayerNorm([out_channels, spatial_size, spatial_size]),
+        #     nn.ReLU(),
+        # )
 
     def _freeze_encoder(self, freeze: bool = True) -> None:
         """Freeze or unfreeze the encoder weights."""
