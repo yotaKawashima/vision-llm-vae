@@ -38,13 +38,13 @@ latent_dim = text_embedding_dim
 #     "/mnt/data/checkpoints/vanilla_from_ae_beta_vae_loss_standard_beta0.001_recon_loss_l2/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
 # )
 
-# checkpoint_path = Path(
-#     "/mnt/data/checkpoints/vanilla_ae_loss_l2/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
-# )
-
 checkpoint_path = Path(
-    "/mnt/data/checkpoints/ae_loss_l2/cocoDoerig/run_0/checkpoint_epoch25.ckpt"
+    "/mnt/data/checkpoints/vanilla_ae_loss_l2/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
 )
+
+# checkpoint_path = Path(
+#     "/mnt/data/checkpoints/ae_loss_l2/cocoDoerig/run_0/checkpoint_epoch25.ckpt"
+# )
 
 
 encoder_checkpoint = False  # whether to initialize the encoder with the checkpoint from the encoder model
