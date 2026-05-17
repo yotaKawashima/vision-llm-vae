@@ -209,7 +209,7 @@ target_layers = [
     "decoder.12.2",
     "decoder.13.2",
     "latent",
-    "mu",
+    # "mu",
 ]
 vision_bias = 0.5
 input_modality = "image"
