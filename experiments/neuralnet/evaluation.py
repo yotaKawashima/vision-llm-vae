@@ -1,5 +1,6 @@
 """Module providing functions for evaluating models."""
 
+from nibabel.testing import data_path
 import torch
 import sys
 from pathlib import Path
@@ -294,6 +295,24 @@ class Evaluator:
             # update counter
             visualized_images += num_images_per_fig
             fig_counter += 1
+
+    def store_posterior_var(self, data_path):
+        """
+        Store the posterior information of the VAE model on the evaluation dataset for visualization.
+        """
+        posterior_log_var = []
+        with torch.inference_mode():
+            for _, batch in enumerate(self.dataloader):
+                images = batch["image"].to(self.device, non_blocking=True)
+
+                _, log_var = self.model.encode(images)
+                posterior_log_var.append(log_var.cpu())
+
+        posterior_log_var = torch.cat(posterior_log_var, dim=0)
+        torch.save(posterior_log_var, data_path)
+        self.logger.log_success(
+            f"Saved posterior log_var of the evaluation dataset to {data_path.absolute()}"
+        )
 
 
 def denormalize(tensor_data, img_mean, img_std):

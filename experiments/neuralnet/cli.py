@@ -313,6 +313,10 @@ class CommandLineInterface:
             num_images_per_fig=5,
         )
 
+        # if vae, store posterior information
+        if self.model_type == "beta_vae":
+            evaluator.store_posterior_var(config.evaluation_log_var_path)
+
     def extract_activations_and_rdm(self, input_modality="image"):
         """
         Extracts activations from the model on the dataset for rsa.

@@ -432,6 +432,7 @@ if eval_flag:
     evaluation_data_dir_path.mkdir(parents=True, exist_ok=True)
     evaluation_loss_path = evaluation_data_dir_path / "evaluation_loss.json"
     evaluation_alignment_data_path = evaluation_data_dir_path / "alignment_data.json"
+    evaluation_log_var_path = evaluation_data_dir_path / "log_var.pt"
 
     model_activation_dir_path = replace_subdir(
         checkpoint_path.parent,
