@@ -775,6 +775,27 @@ class CommandLineInterface:
             help="The weight for the norm loss when loss_type is l2_and_img_norm. Defaults to config.delta.",
         )
         evaluation_command_parser.add_argument(
+            "--encoder-checkpoint",
+            dest="encoder_checkpoint",
+            action=argparse.BooleanOptionalAction,
+            default=config.encoder_checkpoint,
+            help="The path to the encoder checkpoint to initialize the encoder with (only applicable for ae model). Defaults to config.encoder_checkpoint.",
+        )
+        evaluation_command_parser.add_argument(
+            "--ae-checkpoint",
+            dest="ae_checkpoint",
+            action=argparse.BooleanOptionalAction,
+            default=config.ae_checkpoint,
+            help="The path to the ae checkpoint to initialize the ae model with (only applicable for beta_vae model). Defaults to config.ae_checkpoint.",
+        )
+        evaluation_command_parser.add_argument(
+            "--vae-checkpoint",
+            dest="vae_checkpoint",
+            action=argparse.BooleanOptionalAction,
+            default=config.vae_checkpoint,
+            help="The path to the vae checkpoint to initialize the vae model with (only applicable for beta_vae model). Defaults to config.vae_checkpoint.",
+        )
+        evaluation_command_parser.add_argument(
             "--temperature",
             dest="temperature",
             type=float,
@@ -846,4 +867,25 @@ class CommandLineInterface:
             type=str,
             default=config.input_modality,
             help="The modality of input data to the model when extracting model activations. Defaults to config.input_modality.",
+        )
+        extract_activations_command_parser.add_argument(
+            "--encoder-checkpoint",
+            dest="encoder_checkpoint",
+            action=argparse.BooleanOptionalAction,
+            default=config.encoder_checkpoint,
+            help="The path to the encoder checkpoint to initialize the encoder with (only applicable for ae model). Defaults to config.encoder_checkpoint.",
+        )
+        extract_activations_command_parser.add_argument(
+            "--ae-checkpoint",
+            dest="ae_checkpoint",
+            action=argparse.BooleanOptionalAction,
+            default=config.ae_checkpoint,
+            help="The path to the ae checkpoint to initialize the ae model with (only applicable for beta_vae model). Defaults to config.ae_checkpoint.",
+        )
+        extract_activations_command_parser.add_argument(
+            "--vae-checkpoint",
+            dest="vae_checkpoint",
+            action=argparse.BooleanOptionalAction,
+            default=config.vae_checkpoint,
+            help="The path to the vae checkpoint to initialize the vae model with (only applicable for beta_vae model). Defaults to config.vae_checkpoint.",
         )
