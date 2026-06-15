@@ -31,7 +31,7 @@ eval_flag = True  # true to make relevant dirs for evaluation and activation ext
 latent_dim = text_embedding_dim
 # checkpoint_path = None
 checkpoint_path = Path(
-    "/mnt/data/checkpoints/beta_vae_loss_llm_alignment_beta0.001_recon_loss_l2_llm_alignment_loss_cosine_similarity_gamma0.5/cocoDoerig/run_0/checkpoint_epoch30.ckpt"
+    "/mnt/data/checkpoints/beta_vae_loss_llm_alignment_beta0.001_recon_loss_l2_llm_alignment_loss_cosine_similarity_gamma0.5/cocoDoerig/run_0/checkpoint_epoch20.ckpt"
 )
 
 # checkpoint_path = Path(
