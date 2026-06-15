@@ -30,9 +30,9 @@ resnet_flag = False
 eval_flag = True  # true to make relevant dirs for evaluation and activation extraction
 latent_dim = text_embedding_dim
 # checkpoint_path = None
-checkpoint_path = Path(
-    "/mnt/data/checkpoints/beta_vae_loss_llm_alignment_beta0.001_recon_loss_l2_llm_alignment_loss_cosine_similarity_gamma0.5/cocoDoerig/run_0/checkpoint_epoch10.ckpt"
-)
+# checkpoint_path = Path(
+#     "/mnt/data/checkpoints/beta_vae_loss_llm_alignment_beta0.001_recon_loss_l2_llm_alignment_loss_cosine_similarity_gamma0.5/cocoDoerig/run_0/checkpoint_epoch10.ckpt"
+# )
 
 # checkpoint_path = Path(
 #     "/mnt/data/checkpoints/vanilla_from_ae_beta_vae_loss_standard_beta0.001_recon_loss_l2/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
@@ -42,16 +42,16 @@ checkpoint_path = Path(
 #     "/mnt/data/checkpoints/vanilla_ae_loss_l2/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
 # )
 
-# checkpoint_path = Path(
-#     "/mnt/data/checkpoints/ae_loss_l2/cocoDoerig/run_0/checkpoint_epoch25.ckpt"
-# )
+checkpoint_path = Path(
+    "/mnt/data/checkpoints/ae_loss_l2/cocoDoerig/run_0/checkpoint_epoch25.ckpt"
+)
 
 encoder_checkpoint = False  # whether to initialize the encoder with the checkpoint from the encoder model
 ae_checkpoint = (
-    False  # whether to initialize the ae model with the checkpoint from the ae model
+    True  # whether to initialize the ae model with the checkpoint from the ae model
 )
 vae_checkpoint = (
-    True  # whether to initialize the vae model with the checkpoint from the vae model
+    False  # whether to initialize the vae model with the checkpoint from the vae model
 )
 loss_type = None
 beta = None
@@ -426,8 +426,16 @@ writer_path = (
 training_history_path = coco_checkpoints_dir_path / "training_history.json"
 
 if eval_flag:
+    if checkpoint_path is not None:
+        if model_type == "beta_vae" and ae_checkpoint and not vae_checkpoint:
+            checkpoint_path_stem = "checkpoint_epoch0"
+        else:
+            checkpoint_path_stem = checkpoint_path.stem
+    else:
+        raise ValueError("checkpoint_path must be specified for evaluation.")
+
     evaluation_data_dir_path = (
-        checkpoint_path.parent / "evaluation" / checkpoint_path.stem
+        coco_checkpoints_dir_path / "evaluation" / checkpoint_path_stem
     )
     evaluation_data_dir_path.mkdir(parents=True, exist_ok=True)
     evaluation_loss_path = evaluation_data_dir_path / "evaluation_loss.json"
@@ -435,15 +443,15 @@ if eval_flag:
     evaluation_log_var_path = evaluation_data_dir_path / "log_var.pt"
 
     model_activation_dir_path = replace_subdir(
-        checkpoint_path.parent,
+        coco_checkpoints_dir_path,
         "checkpoints",
         "model_activations",
     )
-    model_activation_dir_path = model_activation_dir_path / checkpoint_path.stem
+    model_activation_dir_path = model_activation_dir_path / checkpoint_path_stem
     model_activation_dir_path.mkdir(parents=True, exist_ok=True)
 
     rsa_dir_path = replace_subdir(
-        checkpoint_path.parent,
+        coco_checkpoints_dir_path,
         "checkpoints",
         "rsa",
     )
