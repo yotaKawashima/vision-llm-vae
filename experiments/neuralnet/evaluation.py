@@ -1,6 +1,5 @@
 """Module providing functions for evaluating models."""
 
-from nibabel.testing import data_path
 import torch
 import sys
 from pathlib import Path
