@@ -25,18 +25,18 @@ batch_size = 128
 learning_rate = 0.0005
 clip_grad_norm = 1.0
 ###### Model ######
-model_type = "ae"  # "encoder", "ae", "beta_vae", "beta_vae_llm", "decoder"
+model_type = "beta_vae"  # "encoder", "ae", "beta_vae", "beta_vae_llm", "decoder"
 resnet_flag = False
 eval_flag = True  # true to make relevant dirs for evaluation and activation extraction
 latent_dim = text_embedding_dim
 # checkpoint_path = None
-# checkpoint_path = Path(
-#     "/mnt/data/checkpoints/beta_vae_loss_llm_alignment_beta0.001_recon_loss_l2_llm_alignment_loss_cosine_similarity_gamma0.5/cocoDoerig/run_0/checkpoint_epoch30.ckpt"
-# )
-
 checkpoint_path = Path(
-    "/mnt/data/checkpoints/vanilla_from_ae_beta_vae_loss_standard_beta0.001_recon_loss_l2/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
+    "/mnt/data/checkpoints/beta_vae_loss_llm_alignment_beta0.001_recon_loss_l2_llm_alignment_loss_cosine_similarity_gamma0.5/cocoDoerig/run_0/checkpoint_epoch30.ckpt"
 )
+
+# checkpoint_path = Path(
+#     "/mnt/data/checkpoints/vanilla_from_ae_beta_vae_loss_standard_beta0.001_recon_loss_l2/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
+# )
 
 # checkpoint_path = Path(
 #     "/mnt/data/checkpoints/vanilla_ae_loss_l2/cocoDoerig/run_0/checkpoint_epoch50.ckpt"
@@ -73,7 +73,7 @@ MODEL_CONFIGS = {
         "loss_type": "l2",
     },
     "beta_vae": {
-        "loss_type": "standard",  # or "llm_alignment"
+        "loss_type": "llm_alignment",  # "standard",  # or "llm_alignment"
         "beta": 0.001,  # beta for KL divergence loss
         "recon_loss_type": "l2",
         "llm_alignment_loss_type": "cosine_similarity",
