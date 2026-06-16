@@ -91,6 +91,7 @@ class Evaluator:
         val_num_processed_samples = 0
         loss_metrics = {}
         cosine_sim_list = []
+        cosine_sim_mu_list = []
         recon_loss_list = []
 
         with torch.inference_mode():
@@ -127,16 +128,22 @@ class Evaluator:
                     )
                     imgs = batch["image"].to(self.device, non_blocking=True)
                     if model_type == "beta_vae":
-                        img_hat, mu, _, _ = self.model(imgs)
+                        img_hat, mu, _, latent_variables = self.model(imgs)
                         # pylint: disable=not-callable
-                        cosine_sim = F.cosine_similarity(text_embeddings, mu, dim=1)
+                        cosine_sim = F.cosine_similarity(
+                            text_embeddings, latent_variables, dim=1
+                        )
+                        cosine_sim_mu = F.cosine_similarity(text_embeddings, mu, dim=1)
                     else:  # model_type == "ae"
                         img_hat, latent = self.model(imgs)
                         # pylint: disable=not-callable
                         cosine_sim = F.cosine_similarity(text_embeddings, latent, dim=1)
+                        cosine_sim_mu = None
 
                     # keep the data for alignment evaluation
                     cosine_sim_list.extend(cosine_sim.detach().cpu().tolist())
+                    if cosine_sim_mu is not None:
+                        cosine_sim_mu_list.extend(cosine_sim_mu.detach().cpu().tolist())
 
                     # also keep the reconstruction loss for alignment evaluation
                     recon_mse_loss = F.mse_loss(img_hat, imgs, reduction="none")
@@ -162,6 +169,8 @@ class Evaluator:
         if model_type in ["beta_vae", "ae"]:
             alignment_data = {}
             alignment_data["cosine_similarity"] = cosine_sim_list
+            if model_type == "beta_vae":
+                alignment_data["cosine_similarity_mu"] = cosine_sim_mu_list
             alignment_data["reconstruction_mse_loss"] = recon_loss_list
         else:
             alignment_data = None
