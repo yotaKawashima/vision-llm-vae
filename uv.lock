@@ -1809,6 +1809,26 @@ wheels = [
 ]
 
 [[package]]
+name = "nilearn"
+version = "0.13.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jinja2" },
+    { name = "joblib" },
+    { name = "nibabel" },
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "pandas" },
+    { name = "requests" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a6/c0/b06fa98658b9f43d7cd89c4b2527a637a2962d05838658f767d8dda8e790/nilearn-0.13.1.tar.gz", hash = "sha256:66d4a4f3f1dea9b8683806849ea8e91abfeac11e14f7e972a726f644e515bc2b", size = 46371538, upload-time = "2026-02-10T17:08:17.287Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/89/3d/91ff1823b291de709e92b01373ab9c1d582658ce4b795e443b76761cd2c8/nilearn-0.13.1-py3-none-any.whl", hash = "sha256:2543cea9e2b001c079b7f81d1bff3050576125eb906cf318a9992add9a63c19e", size = 10638666, upload-time = "2026-02-10T17:04:47.21Z" },
+]
+
+[[package]]
 name = "notebook"
 version = "7.4.7"
 source = { registry = "https://pypi.org/simple" }
@@ -3541,6 +3561,7 @@ dependencies = [
     { name = "kornia" },
     { name = "matplotlib" },
     { name = "nibabel" },
+    { name = "nilearn" },
     { name = "pandas" },
     { name = "plotly" },
     { name = "pycocotools" },
@@ -3568,6 +3589,7 @@ requires-dist = [
     { name = "kornia", specifier = "==0.7.1" },
     { name = "matplotlib", specifier = ">=3.10.7" },
     { name = "nibabel", specifier = ">=5.4.2" },
+    { name = "nilearn", specifier = ">=0.13.1" },
     { name = "pandas", specifier = ">=2.3.3" },
     { name = "plotly", specifier = ">=6.3.1" },
     { name = "pycocotools", specifier = ">=2.0.10" },
