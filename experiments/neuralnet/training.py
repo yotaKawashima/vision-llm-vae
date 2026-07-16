@@ -175,8 +175,6 @@ class DataParallelismTrainer:
 
         if self.original_model.lr_scheduler_state_dict is not None:
             self.scheduler.load_state_dict(self.original_model.lr_scheduler_state_dict)
-            # Update T_max in case number_of_epochs has changed
-            self.scheduler.T_max = number_of_epochs
 
         # Restore Epoch
         start_epoch = self.original_model.epoch
