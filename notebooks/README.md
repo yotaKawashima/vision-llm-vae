@@ -1,5 +1,5 @@
 ## Notebooks
-Each notebook under `notebooks/` produces the paper figures/tables. You need data for these notebooks.
+Each notebook under `notebooks/` produces the paper figures/tables.
 
 - `fig1_schematic.ipynb`
     Model schematic and ROI visualization
