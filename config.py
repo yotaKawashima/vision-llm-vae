@@ -191,7 +191,7 @@ def nsd_stimulus_info_path_this_subject(subject):
 ############################################################################
 
 ############################################################################
-##### activation extraction for encoding model analysis #####
+##### activation extraction for RSA #####
 target_layers = [
     "encoder.1.2",
     "encoder.2.2",
