@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository explores whether guiding a Variational Autoencoder (VAE) with a Large Language Model (LLM) improves its representational alignment with the human visual system. We introduced an **LLM-guided VAE** whose posterior means are constrained by LLM embeddings of image captions, and evaluated it against functional magnetic resonance imaging (fMRI) data from natural scene viewing. The full thesis is available [here](thesis.pdf).
+This repository explores whether guiding a Variational Autoencoder (VAE) with a Large Language Model (LLM) helps it learn more semantic representations and improves its representational alignment with the human visual system. We introduced an **LLM-guided VAE** whose posterior means are constrained by LLM embeddings of image captions, and evaluated it against functional magnetic resonance imaging (fMRI) data from natural scene viewing. The full thesis is available [here](thesis.pdf).
 
 ![VAE overview](vae_overview.png)
 
