@@ -1,0 +1,21 @@
+Bootstrap: docker
+From: nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+
+%files
+  ./pyproject.toml /opt/pyproject.toml
+  ./uv.lock /opt/uv.lock
+
+%environment
+  export UV_COMPILE_BYTECODE=1
+  export UV_NO_CACHE=1
+  export PATH=/opt/.venv/bin:$PATH
+  export VIRTUAL_ENV=/opt/.venv
+
+%post
+  export TMPDIR=/scratch/yota/tmp
+  mkdir -p $TMPDIR
+  apt -y update
+  apt -y install curl
+  curl -LsSf https://astral.sh/uv/install.sh | env UV_UNMANAGED_INSTALL="/usr/bin" sh
+  cd /opt/
+  uv sync --frozen
