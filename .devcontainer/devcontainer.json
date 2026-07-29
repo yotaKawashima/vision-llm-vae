@@ -9,7 +9,7 @@
     "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached"
   ],
   "remoteUser": "guest-user",
-  "postCreateCommand": "uv sync --frozen && uv run python -m ipykernel install --user --name=workspace --display-name='Python (workspace .venv)'",
+  "postStartCommand": "uv sync --frozen && uv run python -m ipykernel install --user --name=workspace --display-name='Python (workspace .venv)'",
   "customizations": {
     "vscode": {
       "extensions": [
