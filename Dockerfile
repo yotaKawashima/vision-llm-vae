@@ -3,17 +3,13 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm
 WORKDIR /workspace
 
 
-# Use system Python for uv installs (single global env in container)
-ENV UV_SYSTEM_PYTHON=1
-
-
 # Install common system dependencies (OpenCV, git, build tools, etc.)
 RUN apt-get update && apt-get install --no-install-recommends -y \
     ca-certificates \
     build-essential
 
-#COPY pyproject.toml uv.lock ./
-#RUN uv sync --frozen
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen
 
 # Create a non-root user (optional but recommended for dev containers)
 ARG USERNAME=guest-user
@@ -29,5 +25,8 @@ RUN groupadd --gid $USER_GID $USERNAME \
     && rm -rf /var/lib/apt/lists/*
 
 USER $USERNAME
+
+# Register the project's .venv as a Jupyter kernel so notebooks see uv-managed packages
+RUN uv run python -m ipykernel install --user --name=workspace --display-name="Python (workspace .venv)"
 
 CMD [ "/bin/bash" ]
